@@ -1,0 +1,677 @@
+---
+
+# DOCUMENTO DE DISEÑO TÉCNICO Y FUNCIONAL
+## TubeMassDL v2.0 - Cazador de Enlaces y Descargador Masivo
+
+**Versión:** 2.0  
+**Fecha:** 2026-07-15  
+**Plataforma:** Windows (.NET 8 WPF)  
+**Estado:** Diseño Final
+
+---
+
+## 1. INTRODUCCIÓN
+
+### 1.1 Propósito
+TubeMassDL es una aplicación de escritorio para Windows que permite capturar enlaces de YouTube y otros sitios (Vimeo, TikTok, Instagram, etc.) de forma automática mediante un **listener del portapapeles**, acumularlos en una **cola de descargas**, y procesarlos masivamente. La aplicación está diseñada para ser **"abrir, copiar enlaces, descargar"** y no requiere instalación de servicios ni procesos en segundo plano al cerrarse.
+
+### 1.2 Objetivos Principales
+1. **Captura automática de enlaces**: Detectar silenciosamente enlaces copiados al portapapeles.
+2. **Cola de descargas**: Acumular enlaces para descarga masiva posterior.
+3. **Descarga inteligente**: Usar `yt-dlp` para sitios multimedia (YouTube, Vimeo, etc.) y HTTP para archivos directos.
+4. **No intrusivo**: Funciona en segundo plano cuando está minimizada, parpadea en la barra de tareas al capturar nuevos enlaces.
+5. **Cero residuos**: Al cerrar la aplicación, **todo** se cierra (sin servicios, sin procesos ocultos).
+
+### 1.3 Flujo de Trabajo del Usuario
+```
+1. Usuario abre TubeMassDL.
+2. La aplicación se minimiza a la bandeja (opcional).
+3. Usuario navega por páginas web copiando enlaces (Ctrl+C).
+4. La aplicación captura los enlaces silenciosamente y los agrega a la cola.
+5. El icono parpadea en la barra de tareas para notificar novedades.
+6. Usuario abre la aplicación, revisa la cola, selecciona enlaces y presiona "Descargar Todos".
+7. La aplicación procesa la cola y guarda los archivos en la carpeta seleccionada.
+8. Usuario cierra la aplicación → **el listener se desactiva inmediatamente**.
+```
+
+---
+
+## 2. REQUISITOS FUNCIONALES
+
+### 2.1 RF-01: Listener de Portapapeles (Clipboard Monitor)
+| ID | RF-01 |
+|----|-------|
+| **Descripción** | La aplicación debe monitorear el portapapeles en segundo plano mientras está abierta. |
+| **Activación** | Se activa automáticamente al iniciar la aplicación. |
+| **Desactivación** | Se desactiva automáticamente al cerrar la aplicación. |
+| **Frecuencia** | Verifica el portapapeles cada 500ms. |
+| **Filtro** | Solo captura URLs válidas (http/https). |
+| **Detección** | Diferencia entre un enlace nuevo y el mismo enlace copiado repetidamente. |
+| **Interacción** | No debe robar foco ni interrumpir al usuario. |
+
+### 2.2 RF-02: Cola de Descargas (Download Queue)
+| ID | RF-02 |
+|----|-------|
+| **Descripción** | Los enlaces capturados se acumulan en una cola persistente durante la sesión. |
+| **Estructura** | Cada item contiene: URL, título (si se puede obtener), fuente, tipo, estado, progreso. |
+| **Selección** | El usuario puede seleccionar/deseleccionar items individuales. |
+| **Estado** | Pendiente, Descargando, Completado, Error. |
+| **Orden** | Los nuevos enlaces se agregan al inicio de la cola. |
+
+### 2.3 RF-03: Detección Multi-Sitio (Híbrida)
+| ID | RF-03 |
+|----|-------|
+| **Descripción** | La aplicación delega la detección y descarga de sitios multimedia a `yt-dlp`. |
+| **Sitios Soportados** | YouTube, Vimeo, Dailymotion, TikTok, Instagram, Facebook, Twitter/X, Twitch, y más de 1800 sitios compatibles con `yt-dlp`. |
+| **Archivos Directos** | Usa `HttpClient` para descarga directa (archivos .mp4, .zip, .pdf, etc.). |
+| **Detección en UI** | Muestra información básica del sitio (nombre, ícono) para transparencia. |
+
+### 2.4 RF-04: Sistema de Bandeja (System Tray)
+| ID | RF-04 |
+|----|-------|
+| **Descripción** | La aplicación puede minimizarse a la bandeja del sistema. |
+| **Icono** | Muestra un ícono en la bandeja. |
+| **Parpadeo** | El ícono parpadea cuando se captura un nuevo enlace (o hay actividad nueva). |
+| **Notificaciones** | Muestra notificaciones emergentes (balloon tips) para nuevos enlaces y eventos de descarga. |
+| **Menú Contextual** | Opciones: Mostrar cola, Pausar/Reanudar captura, Salir. |
+| **Comportamiento** | No es un servicio: solo está activo mientras la app está abierta. |
+
+### 2.5 RF-05: Barra de Tareas (Taskbar Flash)
+| ID | RF-05 |
+|----|-------|
+| **Descripción** | La aplicación parpadea en la barra de tareas cuando hay novedades. |
+| **Eventos** | Nuevo enlace capturado, descarga completada, error. |
+| **Duración** | Parpadea hasta que el usuario abre la ventana. |
+
+### 2.6 RF-06: Descarga Uno a Uno con Progreso
+| ID | RF-06 |
+|----|-------|
+| **Descripción** | Los videos se descargan en secuencia (uno tras otro) para estabilidad. |
+| **Progreso** | Barra de progreso individual por item, y barra general en la UI. |
+| **Control** | Pausar, Reanudar, Detener funcionan en tiempo real. |
+| **Cola** | Puede procesar toda la cola o solo los items seleccionados. |
+
+### 2.7 RF-07: Actualización Automática de yt-dlp
+| ID | RF-07 |
+|----|-------|
+| **Descripción** | La app verifica y descarga la última versión de `yt-dlp` al iniciar. |
+| **Fuente** | GitHub Releases. |
+| **Comportamiento** | Si no hay internet, usa la versión local (si existe). |
+
+---
+
+## 3. REQUISITOS NO FUNCIONALES
+
+### 3.1 RNF-01: Rendimiento
+- La UI no debe congelarse durante las descargas (uso de `async/await` y `Task`).
+- El listener del portapapeles debe tener un impacto mínimo en el rendimiento del sistema.
+- Uso de memoria < 200MB.
+
+### 3.2 RNF-02: Usabilidad
+- "Abres la app, copias enlaces, descargas." Sin configuración compleja.
+- Feedback visual inmediato: ícono parpadea, notificaciones, progreso en la UI.
+- Botones grandes y claros.
+
+### 3.3 RNF-03: Cero Residuos
+- Al cerrar la aplicación, **no quedan procesos en segundo plano**.
+- No se registra en el inicio de Windows.
+- No se instalan servicios.
+
+### 3.4 RNF-04: Compatibilidad
+- Windows 10/11 (x64).
+- .NET 8 Runtime (empaquetado).
+- Firefox o Chrome para cookies (para sitios que requieran autenticación).
+
+---
+
+## 4. ARQUITECTURA TÉCNICA
+
+### 4.1 Stack Tecnológico
+
+| Componente | Tecnología | Versión |
+|------------|------------|---------|
+| Framework | .NET | 8.0 |
+| UI | WPF | - |
+| Lenguaje | C# | 12.0 |
+| JSON | System.Text.Json | - |
+| HTTP | HttpClient | - |
+| Procesos | System.Diagnostics.Process | - |
+| Sistema | System.Windows.Forms (NotifyIcon) | - |
+| Empaquetado | Visual Studio Installer | - |
+
+### 4.2 Estructura de Directorios
+
+```
+TubeMassDL/
+├── TubeMassDL.sln
+├── TubeMassDL/
+│   ├── Models/
+│   │   ├── VideoInfo.cs
+│   │   ├── DownloadQueueItem.cs
+│   │   └── SiteInfo.cs
+│   ├── Services/
+│   │   ├── ClipboardMonitor.cs
+│   │   ├── SystemTrayService.cs
+│   │   ├── LinkCollector.cs
+│   │   ├── DownloadManager.cs
+│   │   ├── YtDlpDownloader.cs
+│   │   ├── HttpDownloader.cs
+│   │   ├── YtdlpUpdater.cs
+│   │   └── SiteDetector.cs
+│   ├── Converters/
+│   │   ├── StatusToColorConverter.cs
+│   │   └── ProgressVisibilityConverter.cs
+│   ├── bin/
+│   │   └── yt-dlp.exe
+│   ├── Resources/
+│   │   ├── icon.ico
+│   │   └── icon_alert.ico
+│   ├── App.xaml
+│   ├── App.xaml.cs
+│   ├── MainWindow.xaml
+│   ├── MainWindow.xaml.cs
+│   ├── TubeMassDL.csproj
+│   └── app.manifest
+```
+
+### 4.3 Diagrama de Clases
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              App (MainWindow)                              │
+│  - _linkCollector: LinkCollector                                           │
+│  - _trayService: SystemTrayService                                         │
+│  - _clipboardMonitor: ClipboardMonitor                                     │
+│  - _downloadManager: DownloadManager                                       │
+│  + StartServices(): void                                                   │
+│  + OnWindowClosing(): void                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           ClipboardMonitor                                  │
+│  - _timer: Timer (500ms)                                                   │
+│  - _lastClipboardText: string                                              │
+│  - _isActive: bool                                                         │
+│  + LinkCaptured: Action<CapturedLink>                                      │
+│  + Start(): void                                                           │
+│  + Stop(): void                                                            │
+│  + Dispose(): void                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            LinkCollector                                   │
+│  - _queue: ObservableCollection<DownloadQueueItem>                         │
+│  - _captureCount: int                                                      │
+│  + QueueUpdated: Action<int>                                               │
+│  + OnLinkCaptured(CapturedLink): void                                      │
+│  + ClearCompleted(): void                                                  │
+│  + ClearAll(): void                                                        │
+│  + GetSelectedItems(): List<DownloadQueueItem>                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           SystemTrayService                                │
+│  - _notifyIcon: NotifyIcon                                                 │
+│  - _blinkTimer: Timer                                                      │
+│  - _isBlinking: bool                                                       │
+│  + ShowNotification(title, message): void                                  │
+│  + StartBlinking(): void                                                   │
+│  + StopBlinking(): void                                                    │
+│  + Dispose(): void                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            DownloadManager                                 │
+│  - _ytDlpDownloader: YtDlpDownloader                                       │
+│  - _httpDownloader: HttpDownloader                                         │
+│  - _siteDetector: SiteDetector                                             │
+│  + DownloadAsync(url, outputPath, format): Task<DownloadResult>            │
+│  + GetLinkInfoAsync(url): Task<LinkInfo>                                   │
+│  + Pause(): void                                                           │
+│  + Resume(): void                                                          │
+│  + Stop(): void                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.4 Flujo de Datos (Secuencia de Captura)
+
+```
+1. Usuario copia enlace (Ctrl+C)
+   ↓
+2. ClipboardMonitor detecta cambio (cada 500ms)
+   ↓
+3. Valida que sea URL y sea nueva
+   ↓
+4. Dispara evento LinkCaptured
+   ↓
+5. LinkCollector recibe el evento
+   ↓
+6. Agrega item a la cola (ObservableCollection)
+   ↓
+7. Notifica a la UI (QueueUpdated)
+   ↓
+8. UI actualiza el ListBox y el contador
+   ↓
+9. SystemTrayService inicia parpadeo
+   ↓
+10. Muestra notificación emergente (balloon tip)
+   ↓
+11. En segundo plano, intenta obtener información del enlace (título, fuente)
+```
+
+### 4.5 Flujo de Datos (Secuencia de Descarga)
+
+```
+1. Usuario selecciona items en la cola
+   ↓
+2. Presiona "DESCARGAR TODOS"
+   ↓
+3. DownloadManager recibe la lista de URLs
+   ↓
+4. Para cada URL:
+   a. SiteDetector detecta el tipo de sitio
+   b. Si es sitio multimedia (YouTube, Vimeo, etc.) → YtDlpDownloader
+   c. Si es archivo directo → HttpDownloader
+   d. Si es desconocido → intenta con yt-dlp primero, fallback a HTTP
+   ↓
+5. Actualiza progreso en cada item
+   ↓
+6. Marca como Completado o Error
+   ↓
+7. Notifica finalización
+```
+
+---
+
+## 5. ESPECIFICACIÓN DE INTERFAZ
+
+### 5.1 Layout Principal (MainWindow.xaml)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ● Listener ACTIVO    TubeMassDL - Cazador de Enlaces                ➖ ✖  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📋 Cola de Descargas [15]    [🧹 Limpiar Completados] [🗑️ Vaciar Cola] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ ☑ Why Do Scientists...   YouTube   [████████░░░░]  45%   Descargando │ │
+│ │ ☑ Así Quedó La Tierra... Vimeo     [████████████] 100%   Completado  │ │
+│ │ ☑ Viaje al Mundo...      TikTok    [████████░░░░]  80%   Descargando │ │
+│ │ ☐ Viaje al Centro...     Instagram [░░░░░░░░░░░░]   0%   Pendiente   │ │
+│ │ ☑ Todas Las Teorías...   Facebook  [████████████] 100%   Error       │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│ [🚀 DESCARGAR TODOS (3)]                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [16:30:01] 🖱️ Listener de enlaces ACTIVADO                                 │
+│ [16:30:15] 📎 Capturado: YouTube - Video                                   │
+│ [16:30:16]   🔗 https://www.youtube.com/watch?v=abc123                     │
+│ [16:30:20] ✅ yt-dlp actualizado (v2026.07.04)                             │
+│ [16:30:25] 🚀 Iniciando descarga de 3 items...                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Componentes UI
+
+| Componente | Tipo | Propósito |
+|------------|------|-----------|
+| `ListenerStatus` | Ellipse | Indicador verde/rojo del listener |
+| `QueueListBox` | ListBox | Muestra la cola de descargas con DataTemplate |
+| `QueueCountText` | TextBlock | Contador de items en la cola |
+| `DownloadButton` | Button | Inicia la descarga de items seleccionados |
+| `RemoveCompletedButton` | Button | Elimina items completados o con error |
+| `ClearQueueButton` | Button | Vacía toda la cola |
+| `MinimizeButton` | Button | Minimiza a la bandeja |
+| `CloseButton` | Button | Cierra la aplicación (con confirmación) |
+| `LogTextBox` | TextBox | Logs en tiempo real |
+
+### 5.3 DataTemplate para DownloadQueueItem
+
+```xml
+<DataTemplate DataType="{x:Type models:DownloadQueueItem}">
+    <Grid Margin="5,3">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        
+        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" 
+                  VerticalAlignment="Center" Margin="0,0,10,0"/>
+        
+        <TextBlock Grid.Column="1" Text="{Binding DisplayName}" 
+                   Foreground="#e0e0e0" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis"/>
+        
+        <TextBlock Grid.Column="2" Text="{Binding Source}" 
+                   Foreground="#888888" VerticalAlignment="Center" 
+                   Margin="0,0,10,0" Width="80"/>
+        
+        <ProgressBar Grid.Column="3" Value="{Binding Progress}" 
+                     Width="80" Height="15" 
+                     Background="#1a1a2e" Foreground="#e94560"
+                     Visibility="{Binding Status, Converter={StaticResource ProgressVisibilityConverter}}"/>
+        
+        <TextBlock Grid.Column="4" Text="{Binding StatusText}" 
+                   Foreground="{Binding Status, Converter={StaticResource StatusToColorConverter}}"
+                   VerticalAlignment="Center" Width="80" TextAlignment="Right"/>
+    </Grid>
+</DataTemplate>
+```
+
+---
+
+## 6. ESPECIFICACIÓN DE SERVICIOS
+
+### 6.1 ClipboardMonitor
+
+**Propósito:** Monitorear el portapapeles en segundo plano.
+
+| Método | Parámetros | Retorno | Descripción |
+|--------|------------|---------|-------------|
+| `Start()` | - | `void` | Activa el monitoreo del portapapeles |
+| `Stop()` | - | `void` | Desactiva el monitoreo |
+| `Dispose()` | - | `void` | Libera recursos y detiene el timer |
+
+**Eventos:**
+- `LinkCaptured`: Se dispara cuando se captura un nuevo enlace válido.
+
+**Comportamiento:**
+- Verifica el portapapeles cada 500ms.
+- Solo captura URLs http/https.
+- Ignora enlaces duplicados.
+- No bloquea la UI.
+
+---
+
+### 6.2 LinkCollector
+
+**Propósito:** Gestionar la cola de enlaces capturados.
+
+| Método | Parámetros | Retorno | Descripción |
+|--------|------------|---------|-------------|
+| `OnLinkCaptured()` | `CapturedLink` | `void` | Agrega un enlace a la cola |
+| `ClearCompleted()` | - | `void` | Elimina items completados o con error |
+| `ClearAll()` | - | `void` | Vacía toda la cola |
+| `GetSelectedItems()` | - | `List<DownloadQueueItem>` | Obtiene items seleccionados |
+
+**Eventos:**
+- `QueueUpdated`: Se dispara cuando la cola cambia.
+
+---
+
+### 6.3 SystemTrayService
+
+**Propósito:** Gestionar el icono en la bandeja del sistema.
+
+| Método | Parámetros | Retorno | Descripción |
+|--------|------------|---------|-------------|
+| `ShowNotification()` | `title, message, timeout` | `void` | Muestra notificación emergente |
+| `StartBlinking()` | - | `void` | Inicia parpadeo del icono |
+| `StopBlinking()` | - | `void` | Detiene parpadeo |
+| `Dispose()` | - | `void` | Libera recursos |
+
+**Menú Contextual:**
+- "📋 Mostrar Cola": Restaura la ventana.
+- "⏸️ Pausar Captura": Pausa/Reanuda el listener.
+- "---": Separador.
+- "🚪 Salir": Cierra la aplicación.
+
+---
+
+### 6.4 DownloadManager
+
+**Propósito:** Orquestar la descarga de enlaces.
+
+| Método | Parámetros | Retorno | Descripción |
+|--------|------------|---------|-------------|
+| `DownloadAsync()` | `url, outputPath, format` | `Task<DownloadResult>` | Descarga una URL |
+| `GetLinkInfoAsync()` | `url` | `Task<LinkInfo>` | Obtiene información del enlace |
+| `Pause()` | - | `void` | Pausa la descarga actual |
+| `Resume()` | - | `void` | Reanuda la descarga |
+| `Stop()` | - | `void` | Detiene la descarga |
+
+**Eventos:**
+- `ProgressUpdated`: Progreso de descarga.
+- `VideoCompleted`: Video completado o con error.
+- `AllCompleted`: Todas las descargas completadas.
+- `Log`: Mensajes de log.
+
+---
+
+### 6.5 YtDlpDownloader
+
+**Propósito:** Descargar contenido multimedia usando `yt-dlp`.
+
+**Comandos utilizados:**
+
+**Carga de lista:**
+```
+yt-dlp --flat-playlist --dump-json --no-warnings --ignore-errors "{url}"
+```
+
+**Descarga (con antibloqueo):**
+```
+yt-dlp --cookies-from-browser chrome
+       --sleep-interval {15-45}
+       --max-sleep-interval {45-90}
+       --limit-rate 5M
+       --wait-for-video 30
+       --retries 5
+       --fragment-retries 5
+       --no-mtime
+       -f "{formato}"
+       -o "{outputPath}\%(title)s.%(ext)s"
+       --no-playlist
+       --progress
+       --newline
+       "{url}"
+```
+
+---
+
+### 6.6 HttpDownloader
+
+**Propósito:** Descarga directa de archivos usando `HttpClient`.
+
+| Método | Parámetros | Retorno | Descripción |
+|--------|------------|---------|-------------|
+| `DownloadAsync()` | `url, outputPath, fileName` | `Task<bool>` | Descarga un archivo |
+| `Pause()` | - | `void` | Pausa la descarga |
+| `Resume()` | - | `void` | Reanuda la descarga |
+| `Stop()` | - | `void` | Detiene la descarga |
+
+---
+
+## 7. MANEJO DE ERRORES
+
+### 7.1 Errores Comunes y Soluciones
+
+| Error | Causa | Solución |
+|-------|-------|----------|
+| `DPAPI` | Chrome cambió encriptación | Usar Firefox o exportar cookies manualmente |
+| `n challenge` | Falta Node.js/EJS | Instalar Node.js y ejecutar `npm install -g ejs` |
+| `Requested format not available` | Formato no disponible | Usar fallback a menor calidad |
+| `HTTP 429` | Demasiadas peticiones | Activar modo antibloqueo |
+| `Acceso denegado al portapapeles` | Permisos de Windows | Ejecutar como administrador |
+
+### 7.2 Estrategia de Reintentos
+- 3 reintentos por video.
+- Espera exponencial: 30s, 60s, 120s.
+- Si falla → marcar como `Error` y continuar con el siguiente.
+
+---
+
+## 8. CONFIGURACIÓN Y DEPLOY
+
+### 8.1 Archivo de Proyecto (TubeMassDL.csproj)
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>disable</Nullable>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyTitle>TubeMassDL</AssemblyTitle>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <Description>Cazador de Enlaces y Descargador Masivo</Description>
+    <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="bin\yt-dlp.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
+```
+
+### 8.2 Recursos
+
+| Recurso | Descripción |
+|---------|-------------|
+| `icon.ico` | Icono normal de la aplicación |
+| `icon_alert.ico` | Icono para parpadeo (con overlay) |
+| `bin\yt-dlp.exe` | Descargado automáticamente al inicio |
+
+### 8.3 Empaquetado
+- Usar **Visual Studio Installer** o **WiX Toolset**.
+- Incluir todos los archivos de `bin\Debug\net8.0-windows\`.
+- El instalador debe crear acceso directo en el escritorio.
+
+---
+
+## 9. PLAN DE PRUEBAS
+
+### 9.1 Pruebas Unitarias
+
+| ID | Prueba | Descripción |
+|----|--------|-------------|
+| PT-01 | `ClipboardMonitor.Start()` | Verifica que el timer se activa |
+| PT-02 | `ClipboardMonitor.Stop()` | Verifica que el timer se detiene |
+| PT-03 | `LinkCollector.OnLinkCaptured()` | Verifica que se agrega a la cola |
+| PT-04 | `LinkCollector.ClearCompleted()` | Verifica que elimina items completados |
+
+### 9.2 Pruebas de Integración
+
+| ID | Prueba | Descripción |
+|----|--------|-------------|
+| PI-01 | Captura de enlace | Copiar URL, verificar que aparece en la cola |
+| PI-02 | Descarga de un video | Seleccionar item y descargar |
+| PI-03 | Descarga de cola | Seleccionar múltiples items y descargar |
+| PI-04 | Parpadeo | Verificar que el icono parpadea al capturar |
+| PI-05 | Notificación | Verificar que aparece notificación emergente |
+| PI-06 | Cierre de app | Verificar que el listener se desactiva |
+
+### 9.3 Pruebas de Aceptación
+
+| ID | Prueba | Criterio de Aceptación |
+|----|--------|------------------------|
+| PA-01 | Apertura de app | Listener activo, icono en bandeja |
+| PA-02 | Captura de enlace | Aparece en la cola con título y fuente |
+| PA-03 | Minimizar | App se va a la bandeja, sigue capturando |
+| PA-04 | Descarga | Archivo guardado en la carpeta correcta |
+| PA-05 | Cierre | Sin procesos en segundo plano |
+
+---
+
+## 10. MEJORAS FUTURAS
+
+| Prioridad | Mejora | Descripción |
+|-----------|--------|-------------|
+| Alta | Arrastrar y soltar | Arrastrar enlaces desde el navegador a la app |
+| Media | Exportar/Importar cola | Guardar la cola en un archivo JSON |
+| Media | Descarga programada | Programar descargas en horarios específicos |
+| Baja | Tema claro/oscuro | Alternar entre temas |
+| Baja | Soporte para más sitios | Delegar a yt-dlp (ya soporta 1800+) |
+
+---
+
+## 11. REFERENCIAS TÉCNICAS
+
+### 11.1 yt-dlp
+- Repositorio: https://github.com/yt-dlp/yt-dlp
+- Documentación: https://github.com/yt-dlp/yt-dlp#readme
+
+### 11.2 WPF
+- DataBinding: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/data/
+- NotifyIcon: https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.notifyicon
+
+### 11.3 .NET
+- Process Management: https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process
+- Clipboard: https://learn.microsoft.com/en-us/dotnet/api/system.windows.clipboard
+
+---
+
+## 12. APÉNDICE: MODELOS DE DATOS
+
+### 12.1 DownloadQueueItem
+
+```csharp
+public class DownloadQueueItem
+{
+    public string Url { get; set; }
+    public string Title { get; set; }
+    public string Source { get; set; }
+    public LinkType Type { get; set; }
+    public DateTime AddedAt { get; set; }
+    public DownloadStatus Status { get; set; }
+    public int Progress { get; set; }
+    public string ErrorMessage { get; set; }
+    public bool IsSelected { get; set; } = true;
+    public string DisplayName => string.IsNullOrEmpty(Title) ? Url : Title;
+    public string StatusText => Status.ToString();
+}
+```
+
+### 12.2 CapturedLink
+
+```csharp
+public class CapturedLink
+{
+    public string Url { get; set; }
+    public DateTime Timestamp { get; set; }
+    public LinkType Type { get; set; }
+}
+```
+
+### 12.3 Enumeraciones
+
+```csharp
+public enum DownloadStatus
+{
+    Pending,
+    Downloading,
+    Completed,
+    Error,
+    Cancelled
+}
+
+public enum LinkType
+{
+    Unknown,
+    VideoLink,
+    Playlist,
+    Channel
+}
+```
+
+---
+
+**FIN DEL DOCUMENTO**
+
+---

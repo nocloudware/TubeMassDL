@@ -1,0 +1,108 @@
+<UserControl x:Class="TubeMassDL.Panels.OptionsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource WindowBackgroundBrush}">
+        <StackPanel Margin="10" MinWidth="250">
+            <!-- Capture toggle -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="CaptureLabel" Grid.Column="0" Text="📋 Captura" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" VerticalAlignment="Center"/>
+                <CheckBox Grid.Column="1" x:Name="CaptureToggle" IsChecked="True" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            </Grid>
+
+            <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,12"/>
+
+            <!-- Manual URL -->
+            <TextBlock x:Name="UrlLabel" Text="URL manual" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4"/>
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="UrlTextBox" Grid.Column="0" Background="{DynamicResource SurfaceAltBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="8,6" FontSize="13"/>
+                <ui:Button Grid.Column="1" Content="+" Margin="6,0,0,0" Padding="10,6" Click="OnAddUrlClick"/>
+            </Grid>
+
+            <!-- Type -->
+            <TextBlock x:Name="TypeLabel" Text="Tipo" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4"/>
+            <ComboBox x:Name="TypeComboBox"
+                      Background="{DynamicResource SurfaceAltBrush}"
+                      Foreground="{DynamicResource TextPrimaryBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      Padding="8,6" FontSize="13"
+                      SelectedIndex="0" Margin="0,0,0,8"
+                      SelectionChanged="OnTypeChanged">
+                <ComboBoxItem>🎬 Video</ComboBoxItem>
+                <ComboBoxItem>🎵 Audio</ComboBoxItem>
+            </ComboBox>
+
+            <!-- Quality -->
+            <TextBlock x:Name="QualityLabel" Text="Calidad" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4"/>
+            <ComboBox x:Name="QualityComboBox"
+                      Background="{DynamicResource SurfaceAltBrush}"
+                      Foreground="{DynamicResource TextPrimaryBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      Padding="8,6" FontSize="13"
+                      SelectedIndex="0" Margin="0,0,0,8">
+                <ComboBoxItem>4K</ComboBoxItem>
+                <ComboBoxItem>1080p</ComboBoxItem>
+                <ComboBoxItem>720p</ComboBoxItem>
+                <ComboBoxItem>480p</ComboBoxItem>
+                <ComboBoxItem>360p</ComboBoxItem>
+            </ComboBox>
+
+            <!-- Format -->
+            <TextBlock x:Name="FormatLabel" Text="Formato" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4"/>
+            <ComboBox x:Name="FormatComboBox"
+                      Background="{DynamicResource SurfaceAltBrush}"
+                      Foreground="{DynamicResource TextPrimaryBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      Padding="8,6" FontSize="13"
+                      SelectedIndex="0" Margin="0,0,0,12"/>
+
+            <!-- Antiblock -->
+            <CheckBox x:Name="AntiBlockCheckBox" Content="🛡️ Antibloqueo" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" IsChecked="True" Margin="0,0,0,12"/>
+
+            <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,12"/>
+
+            <!-- Action buttons -->
+            <ui:Button x:Name="DownloadButton" Content="🚀 DESCARGAR" Appearance="Primary" Margin="0,0,0,8" Height="40" FontSize="14" Click="OnDownloadClick"/>
+
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="6"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="6"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <ui:Button Grid.Column="0" x:Name="PauseButton" Content="⏸️" Appearance="Secondary" IsEnabled="False" Click="OnPauseClick"/>
+                <ui:Button Grid.Column="2" x:Name="StopButton" Content="⏹️" Appearance="Secondary" IsEnabled="False" Click="OnStopClick"/>
+                <ui:Button Grid.Column="4" x:Name="ClearButton" Content="🗑️" Appearance="Secondary" Click="OnClearClick"/>
+            </Grid>
+
+            <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,12"/>
+
+            <!-- Output folder -->
+            <TextBlock x:Name="FolderLabel" Text="Carpeta" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="OutputPathText"
+                         Grid.Column="0"
+                         Background="{DynamicResource SurfaceAltBrush}"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         BorderBrush="{DynamicResource BorderBrush}"
+                         Padding="8,6" FontSize="12" IsReadOnly="True"/>
+                <ui:Button Grid.Column="1" Content="..." Margin="6,0,0,0" Padding="8,6" Click="OnChangePathClick"/>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

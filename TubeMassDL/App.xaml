@@ -1,0 +1,27 @@
+<Application x:Class="TubeMassDL.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:local="clr-namespace:TubeMassDL.Converters">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+                <ResourceDictionary Source="pack://application:,,,/NoCloudware.UI.Core;component/Themes/Aether/AetherTheme.xaml" />
+                <ResourceDictionary Source="/TubeMassDL;component/Resources/QueueItemTemplate.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <local:StatusToColorConverter x:Key="StatusToColorConverter"/>
+            <local:ProgressVisibilityConverter x:Key="ProgressVisibilityConverter"/>
+            <local:TreeItemIconVisibilityConverter x:Key="TreeItemIconVisibilityConverter"/>
+            <local:DeleteIconVisibilityConverter x:Key="DeleteIconVisibilityConverter"/>
+            <local:TreeItemIconForegroundConverter x:Key="TreeItemIconForegroundConverter"/>
+            <local:TreeItemCommandConverter x:Key="TreeItemCommandConverter"/>
+            <local:IconConverter x:Key="IconConverter"/>
+            <local:ExtensionConverter x:Key="ExtensionConverter"/>
+            <local:FileSizeConverter x:Key="FileSizeConverter"/>
+            <local:StatusDotColorConverter x:Key="StatusDotColorConverter"/>
+            <local:PlaylistCountConverter x:Key="PlaylistCountConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,33 @@
+# Build outputs
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# User-specific files
+*.user
+*.suo
+*.userprefs
+
+# IDE
+.vs/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# NuGet
+packages/
+*.nupkg
+
+# yt-dlp (already committed)
+!**/bin/yt-dlp.exe
+
+# Resources (keep)
+!**/Resources/*
+
+# Logs
+*.log
