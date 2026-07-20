@@ -1,9 +1,7 @@
 using System.Globalization;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using NoCloudware.UI.Core.Controls;
-using NoCloudware.UI.Core.ViewModels;
 using TubeMassDL.Models;
 using TubeMassDL.Services;
 
@@ -71,57 +69,31 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
         if (_downloadManager.IsPaused)
         {
             _downloadManager.Resume();
-            PauseButton.Content = "⏸️";
+            PauseButton.Content = "PAUSAR";
         }
         else
         {
             // Try to pause the currently processing item
             _downloadManager.Pause();
-            PauseButton.Content = "▶️ Resume";
+            PauseButton.Content = "REANUDAR";
         }
         StopButton.IsEnabled = true;
-    }
-
-    private void PauseCurrentProcessingItem()
-    {
-        if (_downloadManager.IsPaused) return;
-
-        // Find the item that's currently being processed (status == Processing)
-        var processingItems = _collector?.Items?.Where(i => i.Status == FileStatus.Processing).ToList();
-        if (processingItems?.Any() == true)
-        {
-            var processingItem = processingItems.First();
-            if (_downloadManager.PauseAndRequeue(processingItem))
-            {
-                // Ensure the pause button indicates we can resume
-                PauseButton.Content = "▶️ Resume";
-            }
-        }
-        else if (!_downloadManager.IsPaused)
-        {
-            // If nothing is processing but we're not in paused state, just take normal pause path
-            _downloadManager.Pause();
-            PauseButton.Content = "▶️ Resume";
-        }
     }
 
     private void OnStopClick(object sender, RoutedEventArgs e)
     {
         _downloadManager.Stop();
-        PauseButton.Content = "⏸️";
+        PauseButton.Content = "PAUSAR";
         SetDownloadingState(false);
-    }
-
-    private void OnClearClick(object sender, RoutedEventArgs e)
-    {
-        _collector.ClearCompleted();
     }
 
     private void OnChangePathClick(object sender, RoutedEventArgs e)
     {
+        var shell = Window.GetWindow(this) as ShellWindow;
+        if (shell == null) return;
         var dialog = new System.Windows.Forms.FolderBrowserDialog();
         if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            OutputPathText.Text = dialog.SelectedPath;
+            shell.MainControl.OutputFolderText = dialog.SelectedPath;
     }
 
     public void ApplyLanguage(CultureInfo ci)
@@ -130,14 +102,12 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
         UrlLabel.Text = Translations.Get("UrlLabel", ci);
         TypeLabel.Text = Translations.Get("TypeLabel", ci);
         FormatLabel.Text = Translations.Get("FormatLabel", ci);
-        FolderLabel.Text = Translations.Get("FolderLabel", ci);
         if (TypeComboBox.Items.Count > 0 && TypeComboBox.Items[0] is ComboBoxItem type0)
             type0.Content = "🎬 " + Translations.Get("TypeVideo", ci);
         if (TypeComboBox.Items.Count > 1 && TypeComboBox.Items[1] is ComboBoxItem type1)
             type1.Content = "🎵 " + Translations.Get("TypeAudio", ci);
         AntiBlockCheckBox.Content = "🛡️ " + Translations.Get("AntiBlock", ci);
-        DownloadButton.Content = "🚀 " + Translations.Get("DownloadBtn", ci);
-        ClearButton.Content = "🗑️";
+        DownloadButton.Content = Translations.Get("DownloadBtn", ci);
     }
 
     public void SetDownloadingState(bool downloading)

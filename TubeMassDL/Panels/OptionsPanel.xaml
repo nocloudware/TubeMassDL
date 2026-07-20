@@ -5,15 +5,12 @@
              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource WindowBackgroundBrush}">
         <StackPanel Margin="10" MinWidth="250">
-            <!-- Capture toggle -->
-            <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="CaptureLabel" Grid.Column="0" Text="📋 Captura" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" VerticalAlignment="Center"/>
-                <CheckBox Grid.Column="1" x:Name="CaptureToggle" IsChecked="True" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-            </Grid>
+            <!-- Capture toggle and Antiblock together at top -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12" HorizontalAlignment="Center">
+                <TextBlock x:Name="CaptureLabel" Text="📋 Captura" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <CheckBox x:Name="CaptureToggle" IsChecked="True" VerticalAlignment="Center" Margin="0,0,24,0"/>
+                <CheckBox x:Name="AntiBlockCheckBox" Content="🛡️ Antibloqueo" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" IsChecked="True" VerticalAlignment="Center"/>
+            </StackPanel>
 
             <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,12"/>
 
@@ -63,46 +60,47 @@
                       Foreground="{DynamicResource TextPrimaryBrush}"
                       BorderBrush="{DynamicResource BorderBrush}"
                       Padding="8,6" FontSize="13"
-                      SelectedIndex="0" Margin="0,0,0,12"/>
-
-            <!-- Antiblock -->
-            <CheckBox x:Name="AntiBlockCheckBox" Content="🛡️ Antibloqueo" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" IsChecked="True" Margin="0,0,0,12"/>
-
-            <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,12"/>
-
-            <!-- Action buttons -->
-            <ui:Button x:Name="DownloadButton" Content="🚀 DESCARGAR" Appearance="Primary" Margin="0,0,0,8" Height="40" FontSize="14" Click="OnDownloadClick"/>
-
-            <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="6"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="6"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <ui:Button Grid.Column="0" x:Name="PauseButton" Content="⏸️" Appearance="Secondary" IsEnabled="False" Click="OnPauseClick"/>
-                <ui:Button Grid.Column="2" x:Name="StopButton" Content="⏹️" Appearance="Secondary" IsEnabled="False" Click="OnStopClick"/>
-                <ui:Button Grid.Column="4" x:Name="ClearButton" Content="🗑️" Appearance="Secondary" Click="OnClearClick"/>
-            </Grid>
+                      SelectedIndex="0" Margin="0,0,0,12">
+                <ComboBoxItem>mp4</ComboBoxItem>
+                <ComboBoxItem>webm</ComboBoxItem>
+                <ComboBoxItem>mkv</ComboBoxItem>
+                <ComboBoxItem>avi</ComboBoxItem>
+            </ComboBox>
 
             <Rectangle Height="1" Fill="{DynamicResource BorderBrush}" Margin="0,0,0,12"/>
 
-            <!-- Output folder -->
-            <TextBlock x:Name="FolderLabel" Text="Carpeta" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4"/>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBox x:Name="OutputPathText"
-                         Grid.Column="0"
-                         Background="{DynamicResource SurfaceAltBrush}"
-                         Foreground="{DynamicResource TextPrimaryBrush}"
-                         BorderBrush="{DynamicResource BorderBrush}"
-                         Padding="8,6" FontSize="12" IsReadOnly="True"/>
-                <ui:Button Grid.Column="1" Content="..." Margin="6,0,0,0" Padding="8,6" Click="OnChangePathClick"/>
-            </Grid>
+            <!-- Action buttons - centered, same size -->
+            <!-- Download button centered on its own line -->
+            <ui:Button x:Name="DownloadButton" Appearance="Primary"
+                       Margin="0,0,0,8" Height="40" Width="200" FontSize="14"
+                       HorizontalAlignment="Center" Click="OnDownloadClick"
+                       Content="DESCARGAR">
+                <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="ArrowDownload20"/>
+                </ui:Button.Icon>
+            </ui:Button>
+
+            <!-- Pause and Stop buttons centered on next line -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
+                <ui:Button x:Name="PauseButton" Appearance="Secondary"
+                           IsEnabled="False" Width="120" Height="40" FontSize="14"
+                           Margin="0,0,8,0" Click="OnPauseClick"
+                           Content="PAUSAR">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="Pause20"/>
+                    </ui:Button.Icon>
+                </ui:Button>
+                <ui:Button x:Name="StopButton" Appearance="Secondary"
+                           IsEnabled="False" Width="120" Height="40" FontSize="14"
+                           Click="OnStopClick"
+                           Content="DETENER">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="Stop20"/>
+                    </ui:Button.Icon>
+                </ui:Button>
+            </StackPanel>
+
+            <!-- Output folder field REMOVED as requested -->
         </StackPanel>
     </ScrollViewer>
 </UserControl>

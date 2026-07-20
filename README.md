@@ -55,15 +55,23 @@ Language is auto-detected from the OS on first run, and can be changed at any ti
 
 Full application theme support via WPF-UI and custom Aether theme dictionaries. Toggle with one click in the header.
 
+### Multi-Select & Batch Operations
+
+- **Multi-select** items in the queue with standard list selection
+- **Download** applies to all selected items at once
+- **Pause** pauses/resumes all active downloads
+- **Stop** cancels active downloads with confirmation (cleans up `.part` files)
+- **Delete** key removes selected items from the queue
+
 ### Keyboard Shortcuts
 
-- `Delete` — Remove the selected item (or entire playlist with children)
+- `Delete` — Remove selected items from queue
 
 ### Double-Click Actions
 
 - **Playlist** — Expand / collapse
 - **Queued / Error item** — Start download immediately (auto-priority: runs now if <3 active, queues otherwise)
-- **Downloading item** — Cancel download and remove from queue (double-click again to stop mid-download)
+- **Downloading item** — Cancel download and remove from queue
 
 ### Download Engine
 
@@ -71,6 +79,31 @@ Full application theme support via WPF-UI and custom Aether theme dictionaries. 
 - **Real-time progress** updates during download
 - yt-dlp auto-update on startup (checks GitHub releases)
 - Firefox cookies for authenticated content
+
+## UI Layout
+
+```
+┌──────────────────────────────────────────────┬──────────────────────┐
+│           File List (Queue)                   │   Config Panel       │
+│  ┌─ Header ───────────────────────────┐      │  ┌────────────────┐  │
+│  │ 📄 Cola de Descargas       (3)     │      │  │ 📋 Captura     │  │
+│  └────────────────────────────────────┘      │  │ 🛡️ Antibloqueo │  │
+│  ┌──────────────────────────────────────┐     │  ├────────────────┤  │
+│  │ 🎬 Video 1                    [░░░] │     │  │ URL manual      │  │
+│  │ 🎬 Video 2                    [░░░] │     │  │ [+ ]           │  │
+│  │ 🎬 Video 3                    [░░░] │     │  ├────────────────┤  │
+│  └──────────────────────────────────────┘     │  │ Tipo / Calidad  │  │
+│  ┌──────────────────────────────────────┐     │  │ Formato         │  │
+│  │ 📂 C:\Users\...\TubeMassDL    [Cambiar]│   │  ├────────────────┤  │
+│  └──────────────────────────────────────┘     │  │  ⬇ DESCARGAR    │  │
+│  ┌──────────────────────────────────────┐     │  │ ⏸ PAUSAR ⏹ DETENER│
+│  │ 3 archivos 2 completados             │     │  └────────────────┘  │
+│  │ 0 pendientes 0 errores               │     └──────────────────────┘
+│  └──────────────────────────────────────┘
+├──────────────────────────────────────────────┴──────────────────────┤
+│ Acerca de  Donar                    ⬇ Descargar todos        ⏻ Salir │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
 ## Architecture
 
@@ -99,7 +132,7 @@ TubeMassDL/
 │   │   ├── StatusToColorConverter.cs
 │   │   └── ProgressVisibilityConverter.cs
 │   ├── Panels/
-│   │   └── OptionsPanel.xaml.cs   # Right sidebar: type, quality, format, antiblock
+│   │   └── OptionsPanel.xaml.cs   # Right sidebar: download/pause/stop controls
 │   ├── Resources/
 │   │   ├── QueueItemTemplate.xaml # List item DataTemplate
 │   │   ├── app.ico
@@ -142,8 +175,9 @@ Or open `TubeMassDL.sln` in Visual Studio and press F5.
 1. Launch the app
 2. Copy any video/playlist URL → it appears in the queue automatically
 3. Configure type (video/audio), quality, format, and anti-block in the right panel
-4. Click **Download All** or double-click individual items
-5. Monitor progress in the status bar
+4. Click **DESCARGAR** or **Descargar todos** to process selected/all items
+5. Monitor progress in the status bar below the file list
+6. Use **PAUSAR** / **DETENER** to control active downloads
 
 ## Configuration
 
@@ -160,8 +194,6 @@ Settings are persisted in `appsettings.json` and restored on startup:
   }
 }
 ```
-
-The output folder path is saved and restored across sessions.
 
 ## Tech Stack
 

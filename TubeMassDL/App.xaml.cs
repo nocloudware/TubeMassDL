@@ -238,7 +238,7 @@ public partial class App : System.Windows.Application
             });
 
             LogMessage(success ? $"Completado: {item.FileName}" : $"Error: {item.FileName}");
-            TaskbarFlashService.Flash(_window);
+            if (_window != null) TaskbarFlashService.Flash(_window);
         };
 
         _downloadManager.AllCompleted += () =>
@@ -249,7 +249,7 @@ public partial class App : System.Windows.Application
             });
 
             LogMessage("Todas las descargas completadas.");
-            TaskbarFlashService.Flash(_window);
+            if (_window != null) TaskbarFlashService.Flash(_window);
         };
     }
 
