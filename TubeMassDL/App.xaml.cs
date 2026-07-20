@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
@@ -36,11 +37,16 @@ public partial class App : System.Windows.Application
                 args.Handled = true;
             };
 
-            var (savedTheme, savedLang) = LoadPreferences();
+            var (savedTheme, savedLang, savedOutputPath) = LoadPreferences();
             InitTheme(savedTheme);
             InitLogging();
             InitUpdater();
             InitWindow();
+            if (!string.IsNullOrEmpty(savedOutputPath))
+            {
+                _window!.OutputFolderText = savedOutputPath;
+                _window!.MainControl.OutputFolderText = savedOutputPath;
+            }
             InitLanguageSelector(savedLang);
             InitServices();
             WireShellEvents();
@@ -59,19 +65,20 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private (bool isDark, string lang) LoadPreferences()
+    private (bool isDark, string lang, string? outputPath) LoadPreferences()
     {
         try
         {
-            if (!File.Exists(_settingsPath)) return (true, "auto");
+            if (!File.Exists(_settingsPath)) return (true, "auto", null);
             var json = File.ReadAllText(_settingsPath);
             using var doc = JsonDocument.Parse(json);
             var s = doc.RootElement.GetProperty("Settings");
             bool dark = s.TryGetProperty("DarkTheme", out var t) ? t.GetBoolean() : true;
             string lang = s.TryGetProperty("Language", out var l) ? l.GetString() ?? "auto" : "auto";
-            return (dark, lang);
+            string? outputPath = s.TryGetProperty("DefaultOutputPath", out var o) ? o.GetString() : null;
+            return (dark, lang, outputPath);
         }
-        catch { return (true, "auto"); }
+        catch { return (true, "auto", null); }
     }
 
     private void SavePreferences()
@@ -79,7 +86,8 @@ public partial class App : System.Windows.Application
         try
         {
             string lang = _languageService.CurrentCulture.TwoLetterISOLanguageName;
-            var prefs = new { Settings = new { DarkTheme = _themeService.IsDarkTheme, Language = lang, MaxConcurrentDownloads = 3, DefaultOutputPath = "TubeMassDL", AntiBlockMode = true } };
+            string outputPath = _window?.MainControl.OutputFolderText ?? "";
+            var prefs = new { Settings = new { DarkTheme = _themeService.IsDarkTheme, Language = lang, MaxConcurrentDownloads = 3, DefaultOutputPath = outputPath, AntiBlockMode = true } };
             File.WriteAllText(_settingsPath, JsonSerializer.Serialize(prefs, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch { }
@@ -116,14 +124,14 @@ public partial class App : System.Windows.Application
             AboutButtonText = "Acerca de",
             DonateButtonText = "Donar",
             ExitButtonText = "Salir",
-            OutputFolderText = "Documentos\\TubeMassDL"
+            OutputFolderText = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TubeMassDL")
         };
         _window.MainControl.ShowSelectFilesButton = Visibility.Collapsed;
         _window.MainControl.OptionsPanelMinWidth = 280;
         _window.MainControl.AppTitle = "TubeMassDL";
         _window.MainControl.AppTagline = "Cazador de Enlaces y Descargador Masivo";
         _window.MainControl.FileListHeader = "Cola de Descargas";
-        _window.MainControl.OutputFolderText = "Documentos\\TubeMassDL";
+        _window.MainControl.OutputFolderText = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TubeMassDL");
         _window.MainControl.GlobalProgressVisible = Visibility.Visible;
     }
 
@@ -211,26 +219,35 @@ public partial class App : System.Windows.Application
 
         _downloadManager.ItemProgress += (item, progress) =>
         {
-            item.Progress = progress;
-            item.StatusText = $"{progress}%";
-            SyncQueueToWindow();
+            _window?.Dispatcher.Invoke(() =>
+            {
+                item.Progress = progress;
+                item.StatusText = $"{progress}%";
+                _window.MainControl.UpdateCounters();
+            });
         };
 
         _downloadManager.ItemCompleted += (item, success) =>
         {
-            item.Status = success ? FileStatus.Processed : FileStatus.Error;
-            item.StatusText = success ? "Completado" : "Error";
-            item.ProgressBarVisible = false;
-            SyncQueueToWindow();
-            if (_window.MainControl.OptionsContent.Content is OptionsPanel panel)
-                panel.SetDownloadingState(false);
+            _window?.Dispatcher.Invoke(() =>
+            {
+                item.Status = success ? FileStatus.Processed : FileStatus.Error;
+                item.StatusText = success ? "Completado" : "Error";
+                item.ProgressBarVisible = false;
+                _window.MainControl.UpdateCounters();
+            });
+
             LogMessage(success ? $"Completado: {item.FileName}" : $"Error: {item.FileName}");
             TaskbarFlashService.Flash(_window);
         };
 
         _downloadManager.AllCompleted += () =>
         {
-            SyncQueueToWindow();
+            _window?.Dispatcher.Invoke(() =>
+            {
+                _window.MainControl.UpdateCounters();
+            });
+
             LogMessage("Todas las descargas completadas.");
             TaskbarFlashService.Flash(_window);
         };
@@ -265,7 +282,7 @@ public partial class App : System.Windows.Application
             }
         };
 
-        _window.ActionClick += async (_, _) =>
+        _window.ActionClick += (_, _) =>
         {
             var selected = _linkCollector?.GetSelectedItems().ToList() ?? new List<BaseFileItem>();
             if (selected.Count == 0)
@@ -274,16 +291,27 @@ public partial class App : System.Windows.Application
                 return;
             }
 
-            var panel = _window.MainControl.OptionsContent.Content as OptionsPanel;
-            panel?.SetDownloadingState(true);
-
+            if (_window.MainControl.OptionsContent.Content is not OptionsPanel panel) return;
             string outputPath = _window.MainControl.OutputFolderText;
-            string format = panel?.GetSelectedFormat() ?? "bestvideo+bestaudio/best";
-            bool antiBlock = panel?.AntiBlockEnabled ?? true;
-            bool extractAudio = panel?.ExtractAudio ?? false;
+            if (string.IsNullOrWhiteSpace(outputPath))
+                outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TubeMassDL");
+            Directory.CreateDirectory(outputPath);
 
-            LogMessage($"Iniciando descarga de {selected.Count} elemento(s)...");
-            await _downloadManager!.StartAsync(selected, outputPath, format, antiBlock, extractAudio);
+            string format = panel.GetSelectedFormat();
+            bool antiBlock = panel.AntiBlockEnabled;
+            bool extractAudio = panel.ExtractAudio;
+
+            var tasks = selected.Select(item => new DownloadTask
+            {
+                Item = item,
+                OutputPath = outputPath,
+                Format = format,
+                AntiBlock = antiBlock,
+                ExtractAudio = extractAudio
+            });
+
+            LogMessage($"Añadiendo {selected.Count} elemento(s) a la cola...");
+            _downloadManager!.Enqueue(tasks);
         };
 
         _window.ExitClick += (_, _) => _window.Close();
@@ -304,7 +332,6 @@ public partial class App : System.Windows.Application
         _window.FileListBox.ItemDoubleClick += (_, args) =>
         {
             var item = args.Item;
-            File.AppendAllText("dclick.log", $"[{DateTime.Now:HH:mm:ss}] DoubleClick: {item.FileName}, source={item.SourceText}\n");
 
             if (item.SourceText == "📁 Playlist")
             {
@@ -313,31 +340,47 @@ public partial class App : System.Windows.Application
             }
             else if (item.Status == FileStatus.Processing)
             {
-                if (_downloadManager!.IsRunning)
-                { _downloadManager.Pause(); File.AppendAllText("dclick.log", "  → Pause\n"); }
-                else
-                { _downloadManager.Resume(); File.AppendAllText("dclick.log", "  → Resume\n"); }
+                // Pause and requeue: move to end of queue
+                bool paused = _downloadManager?.PauseAndRequeue(item) ?? false;
+                if (paused)
+                {
+                    LogMessage($"Pausado y movido al final: {item.FileName}");
+                    SyncQueueToWindow();
+                }
             }
             else if (item.Status is FileStatus.Queued or FileStatus.Error)
             {
-                _ = DownloadSingleItemAsync(item);
+                DownloadSingleItem(item);
             }
         };
     }
 
-    private async Task DownloadSingleItemAsync(BaseFileItem item)
+    private void DownloadSingleItem(BaseFileItem item)
     {
         if (_window?.MainControl.OptionsContent.Content is not OptionsPanel panel) return;
         if (_downloadManager == null) return;
 
-        panel.SetDownloadingState(true);
         string outputPath = _window.MainControl.OutputFolderText;
         string format = panel.GetSelectedFormat();
         bool antiBlock = panel.AntiBlockEnabled;
         bool extractAudio = panel.ExtractAudio;
 
-        LogMessage($"Descargando: {item.FileName}");
-        await _downloadManager.StartAsync(new[] { item }, outputPath, format, antiBlock, extractAudio);
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TubeMassDL");
+            _window.MainControl.OutputFolderText = outputPath;
+        }
+        Directory.CreateDirectory(outputPath);
+
+        LogMessage($"Añadiendo a cola: {item.FileName}");
+        _downloadManager.Enqueue(new DownloadTask
+        {
+            Item = item,
+            OutputPath = outputPath,
+            Format = format,
+            AntiBlock = antiBlock,
+            ExtractAudio = extractAudio
+        });
     }
 
     private void WireWindowClose()

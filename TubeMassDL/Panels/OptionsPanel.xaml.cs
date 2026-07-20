@@ -1,7 +1,9 @@
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using NoCloudware.UI.Core.Controls;
+using NoCloudware.UI.Core.ViewModels;
 using TubeMassDL.Models;
 using TubeMassDL.Services;
 
@@ -66,14 +68,47 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
 
     private void OnPauseClick(object sender, RoutedEventArgs e)
     {
-        _downloadManager.Pause();
-        PauseButton.IsEnabled = false;
+        if (_downloadManager.IsPaused)
+        {
+            _downloadManager.Resume();
+            PauseButton.Content = "⏸️";
+        }
+        else
+        {
+            // Try to pause the currently processing item
+            _downloadManager.Pause();
+            PauseButton.Content = "▶️ Resume";
+        }
         StopButton.IsEnabled = true;
+    }
+
+    private void PauseCurrentProcessingItem()
+    {
+        if (_downloadManager.IsPaused) return;
+
+        // Find the item that's currently being processed (status == Processing)
+        var processingItems = _collector?.Items?.Where(i => i.Status == FileStatus.Processing).ToList();
+        if (processingItems?.Any() == true)
+        {
+            var processingItem = processingItems.First();
+            if (_downloadManager.PauseAndRequeue(processingItem))
+            {
+                // Ensure the pause button indicates we can resume
+                PauseButton.Content = "▶️ Resume";
+            }
+        }
+        else if (!_downloadManager.IsPaused)
+        {
+            // If nothing is processing but we're not in paused state, just take normal pause path
+            _downloadManager.Pause();
+            PauseButton.Content = "▶️ Resume";
+        }
     }
 
     private void OnStopClick(object sender, RoutedEventArgs e)
     {
         _downloadManager.Stop();
+        PauseButton.Content = "⏸️";
         SetDownloadingState(false);
     }
 
@@ -115,18 +150,27 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
     public string GetSelectedFormat()
     {
         bool isVideo = TypeComboBox.SelectedIndex == 0;
-        string selectedFormat = FormatComboBox.SelectedItem is ComboBoxItem item
+        string sf = FormatComboBox.SelectedItem is ComboBoxItem item
             ? item.Content?.ToString()?.ToLowerInvariant() ?? "mp4"
             : "mp4";
 
         if (!isVideo)
-            return $"bestaudio/best";
+        {
+            // Audio: request native format directly when possible
+            return sf switch
+            {
+                "m4a" => "bestaudio[ext=m4a]/bestaudio/best",
+                "opus" => "bestaudio[ext=opus]/bestaudio/best",
+                "mp3" or "wav" => "bestaudio/best",
+                _ => "bestaudio[ext=m4a]/bestaudio/best"
+            };
+        }
 
         string quality = QualityComboBox.SelectedItem is ComboBoxItem qItem
             ? qItem.Content?.ToString() ?? ""
             : "";
 
-        string codec = selectedFormat switch
+        string codec = sf switch
         {
             "mp4" => "mp4",
             "webm" => "webm",

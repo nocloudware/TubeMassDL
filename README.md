@@ -62,8 +62,15 @@ Full application theme support via WPF-UI and custom Aether theme dictionaries. 
 ### Double-Click Actions
 
 - **Playlist** — Expand / collapse
-- **Single item (queued)** — Start download
-- **Single item (downloading)** — Pause / resume
+- **Queued / Error item** — Start download immediately (auto-priority: runs now if <3 active, queues otherwise)
+- **Downloading item** — Cancel download and remove from queue (double-click again to stop mid-download)
+
+### Download Engine
+
+- Up to **3 concurrent downloads** (auto-priority queue)
+- **Real-time progress** updates during download
+- yt-dlp auto-update on startup (checks GitHub releases)
+- Firefox cookies for authenticated content
 
 ## Architecture
 
@@ -140,7 +147,7 @@ Or open `TubeMassDL.sln` in Visual Studio and press F5.
 
 ## Configuration
 
-Settings are persisted in `appsettings.json`:
+Settings are persisted in `appsettings.json` and restored on startup:
 
 ```json
 {
@@ -148,11 +155,13 @@ Settings are persisted in `appsettings.json`:
     "DarkTheme": true,
     "Language": "auto",
     "MaxConcurrentDownloads": 3,
-    "DefaultOutputPath": "TubeMassDL",
+    "DefaultOutputPath": "C:\\Users\\<you>\\Documents\\TubeMassDL",
     "AntiBlockMode": true
   }
 }
 ```
+
+The output folder path is saved and restored across sessions.
 
 ## Tech Stack
 

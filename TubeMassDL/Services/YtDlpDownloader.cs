@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using NoCloudware.UI.Core.ViewModels;
 using TubeMassDL.Models;
 
@@ -82,7 +83,8 @@ public class YtDlpDownloader
                 args.Add("youtube:player_client=android,web");
             }
 
-            args.Add("--cookies-from-browser"); args.Add("chrome");
+            // Firefox cookies most compatible with yt-dlp
+            args.Add("--cookies-from-browser"); args.Add("firefox");
 
             string? nodePath = GetNodePath();
             if (nodePath != null)
@@ -94,12 +96,12 @@ public class YtDlpDownloader
             if (antiBlock)
             {
                 var rng = new Random();
-                args.Add("--sleep-interval"); args.Add(rng.Next(15, 45).ToString());
-                args.Add("--max-sleep-interval"); args.Add(rng.Next(45, 90).ToString());
+                args.Add("--sleep-interval"); args.Add(rng.Next(5, 15).ToString());
+                args.Add("--max-sleep-interval"); args.Add(rng.Next(15, 30).ToString());
                 args.Add("--limit-rate"); args.Add("5M");
-                args.Add("--wait-for-video"); args.Add("30");
-                args.Add("--retries"); args.Add("5");
-                args.Add("--fragment-retries"); args.Add("5");
+                args.Add("--wait-for-video"); args.Add("5");
+                args.Add("--retries"); args.Add("3");
+                args.Add("--fragment-retries"); args.Add("3");
                 args.Add("--no-mtime");
             }
 
@@ -108,8 +110,23 @@ public class YtDlpDownloader
             if (extractAudio)
             {
                 args.Add("--extract-audio");
-                args.Add("--audio-format"); args.Add("mp3");
+                string audioFmt = format.Contains("m4a") ? "m4a" :
+                                  format.Contains("opus") ? "opus" :
+                                  format.Contains("mp3") ? "mp3" :
+                                  format.Contains("wav") ? "wav" : "m4a";
+                args.Add("--audio-format"); args.Add(audioFmt);
             }
+            else
+            {
+                // For video: recode to requested container if the direct codec isn't available
+                string videoExt = GetRequestedVideoExt(format);
+                if (!string.IsNullOrEmpty(videoExt) && videoExt != "mp4")
+                {
+                    args.Add("--recode-video"); args.Add(videoExt);
+                }
+            }
+
+            args.Add("--ignore-errors");
 
             string safeOutput = Path.Combine(outputPath, "%(title)s.%(ext)s");
             args.Add("-o"); args.Add(safeOutput);
@@ -129,6 +146,14 @@ public class YtDlpDownloader
             foreach (var a in args) psi.ArgumentList.Add(a);
 
             _currentProcess = new Process { StartInfo = psi, EnableRaisingEvents = true };
+
+            // Kill process if cancellation is requested
+            _cts?.Token.Register(() =>
+            {
+                try { if (_currentProcess != null && !_currentProcess.HasExited) _currentProcess.Kill(); } catch { }
+            });
+
+            _currentProcess.Start();
 
             string? capturedFile = null;
             string? mergedFile = null;
@@ -193,6 +218,13 @@ public class YtDlpDownloader
     {
         _cts?.Cancel();
         try { _currentProcess?.Kill(); } catch { }
+    }
+
+    private static string GetRequestedVideoExt(string format)
+    {
+        // Extract video extension from yt-dlp format string, e.g. "bestvideo[ext=webm]+bestaudio/best" -> "webm"
+        var match = Regex.Match(format, @"\[ext=(\w+)\]");
+        return match.Success ? match.Groups[1].Value : "";
     }
 
     private static string? GetNodePath()
