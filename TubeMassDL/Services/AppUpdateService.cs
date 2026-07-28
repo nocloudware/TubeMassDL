@@ -22,7 +22,7 @@ public class AppUpdateService
     public AppUpdateService()
     {
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("TubeMassDL/2.0");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("TubeMassDL/1.0");
         _http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         _http.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip");
     }
@@ -37,7 +37,7 @@ public class AppUpdateService
             };
             using var client = new HttpClient(handler);
             client.Timeout = TimeSpan.FromSeconds(30);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("TubeMassDL/2.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("TubeMassDL/1.0");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
             client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip");
 

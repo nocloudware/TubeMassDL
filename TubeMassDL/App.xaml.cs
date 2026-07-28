@@ -58,7 +58,7 @@ public partial class App : System.Windows.Application
             var optionsPanel = new OptionsPanel(_linkCollector!, _downloadManager!, _updater!);
             _window!.MainControl.OptionsContent.Content = optionsPanel;
 
-            LogMessage("TubeMassDL v2.0 iniciado.");
+            LogMessage("TubeMassDL v1.0 iniciado.");
             _window!.Show();
         }
         catch (Exception ex)
@@ -272,7 +272,7 @@ public partial class App : System.Windows.Application
                 ?.GetName().Version;
             var appVersion = assemblyVer != null
                 ? $"{assemblyVer.Major}.{assemblyVer.Minor}.{assemblyVer.Build}"
-                : "2.0.0";
+                : "1.0.0";
             var about = new AboutDialog
             {
                 AppName = "TubeMassDL",
