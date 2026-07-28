@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using NoCloudware.UI.Core.ViewModels;
-using TubeMassDL.Models;
 
 namespace TubeMassDL.Services;
 
@@ -137,9 +136,36 @@ public class DownloadManager
         item.Status = FileStatus.Queued;
         item.Progress = 0;
         item.ProgressBarVisible = false;
-        item.StatusText = "Detenido";
+        item.StatusText = "⏸";
         ItemProgress?.Invoke(item, 0);
         return true;
+    }
+
+    public void StopItem(BaseFileItem item)
+    {
+        string? outputPath = null;
+        // Cancelar proceso activo
+        if (_active.TryRemove(item, out var entry))
+        {
+            outputPath = entry.Task.OutputPath;
+            entry.Cts.Cancel();
+        }
+
+        // Quitar de la cola si está esperando
+        var filtered = _queue.Where(t => t.Item != item).ToList();
+        while (_queue.TryDequeue(out _)) { }
+        foreach (var t in filtered) _queue.Enqueue(t);
+
+        // Limpiar archivos .part al detener explícitamente
+        if (!string.IsNullOrEmpty(outputPath))
+            YtDlpDownloader.CleanupPartFiles(outputPath, item.FilePath);
+
+        // Marcar como error
+        item.Status = FileStatus.Error;
+        item.Progress = 0;
+        item.ProgressBarVisible = false;
+        item.StatusText = "✗";
+        ItemCompleted?.Invoke(item, false);
     }
 
     private async Task ProcessItemAsync(DownloadTask task, CancellationToken ct)
@@ -204,8 +230,31 @@ public class DownloadManager
         item.ProgressBarVisible = false;
         item.Status = success ? FileStatus.Processed : FileStatus.Error;
         item.StatusText = success ? "✓" : "✗";
+
         if (!success && !string.IsNullOrEmpty(item.ResultMessage))
-            item.StatusText = "Error: " + item.ResultMessage;
+        {
+            if (item.ResultMessage == "LOGIN_REQUIRED")
+            {
+                item.StatusText = Translations.Get("LoginRequired");
+                item.ResultMessage = Translations.Get("LoginRequiredMsg");
+            }
+            else if (item.ResultMessage == "LOGIN_REQUIRED_NO_COOKIES")
+            {
+                item.StatusText = Translations.Get("CookiesNotFound");
+                item.ResultMessage = Translations.Get("CookiesNotFoundMsg");
+            }
+            else
+            {
+                item.StatusText = "Error: " + item.ResultMessage;
+            }
+        }
+
+        // Clean up .part files on permanent failure (not on cancel, which enables resume)
+        if (!success && !string.IsNullOrEmpty(task.OutputPath))
+        {
+            YtDlpDownloader.CleanupPartFiles(task.OutputPath, item.FilePath);
+        }
+
         ItemCompleted?.Invoke(item, success);
     }
 }

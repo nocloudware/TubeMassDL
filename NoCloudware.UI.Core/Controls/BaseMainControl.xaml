@@ -171,15 +171,16 @@
             </Border>
         </Grid>
 
-        <!-- ── Bottom bar: mirrors main column structure so Action button aligns with config panel ── -->
+        <!-- ── Bottom bar: Action button centered, About on left, Exit on right ── -->
         <Grid Grid.Row="2" Margin="0,10,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Left column: About, Donate, and centered Tips -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal">
+            <!-- Left: About, Donate -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
                 <ui:Button Click="OnAboutClick"
                            Appearance="Transparent"
                            Padding="6,4"
@@ -199,33 +200,32 @@
                         <ui:SymbolIcon Symbol="Money24" Foreground="{DynamicResource AccentBrush}"/>
                     </ui:Button.Icon>
                 </ui:Button>
+            </StackPanel>
 
-                <!-- Tips: clickable, green, shows rotating list -->
+            <!-- Center: Action (Descargar todos) -->
+            <ui:Button Grid.Column="1"
+                       x:Name="ActionBtn"
+                       Click="OnActionClick"
+                       Appearance="Primary"
+                       MinWidth="{Binding ActionButtonMinWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                       Content="{Binding ActionButtonText, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="ArrowSyncCircle20"/>
+                </ui:Button.Icon>
+            </ui:Button>
+
+            <!-- Right: Tips + Exit -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="TipsTextBlock"
                            Text="{Binding CurrentTip, RelativeSource={RelativeSource AncestorType=UserControl}}"
                            Foreground="{DynamicResource AccentBrush}"
                            FontSize="{Binding TipsFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
                            VerticalAlignment="Center"
-                           Margin="12,0,0,0"
+                           Margin="0,0,12,0"
                            TextTrimming="CharacterEllipsis"
                            MaxWidth="300"
                            Cursor="Hand"
                            MouseLeftButtonDown="OnTipsClick"/>
-            </StackPanel>
-
-            <!-- Right column: Action + Exit, left-aligned relative to config panel -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <ui:Button x:Name="ActionBtn"
-                           Click="OnActionClick"
-                           Appearance="Primary"
-                           Margin="0,0,6,0"
-                           MinWidth="{Binding ActionButtonMinWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                           Content="{Binding ActionButtonText, RelativeSource={RelativeSource AncestorType=UserControl}}">
-                    <ui:Button.Icon>
-                        <ui:SymbolIcon Symbol="ArrowSyncCircle20"/>
-                    </ui:Button.Icon>
-                </ui:Button>
-
                 <ui:Button Click="OnExitClick"
                            Appearance="Secondary"
                            Content="{Binding ExitButtonText, RelativeSource={RelativeSource AncestorType=UserControl}}">

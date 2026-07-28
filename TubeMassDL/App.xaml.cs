@@ -17,6 +17,9 @@ namespace TubeMassDL;
 
 public partial class App : System.Windows.Application
 {
+    internal static string DefaultOutputPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "TubeMassDL");
+
     private ClipboardMonitor? _clipboardMonitor;
     private DownloadManager? _downloadManager;
     private LinkCollector? _linkCollector;
@@ -124,14 +127,14 @@ public partial class App : System.Windows.Application
             AboutButtonText = "Acerca de",
             DonateButtonText = "Donar",
             ExitButtonText = "Salir",
-            OutputFolderText = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TubeMassDL")
+            OutputFolderText = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Downloads", "TubeMassDL")
         };
         _window.MainControl.ShowSelectFilesButton = Visibility.Collapsed;
         _window.MainControl.OptionsPanelMinWidth = 280;
         _window.MainControl.AppTitle = "TubeMassDL";
         _window.MainControl.AppTagline = "Cazador de Enlaces y Descargador Masivo";
         _window.MainControl.FileListHeader = "Cola de Descargas";
-        _window.MainControl.OutputFolderText = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TubeMassDL");
+        _window.MainControl.OutputFolderText = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Downloads", "TubeMassDL");
         _window.MainControl.GlobalProgressVisible = Visibility.Visible;
     }
 
@@ -184,7 +187,6 @@ public partial class App : System.Windows.Application
         _window.ExitButtonText = Translations.Get("ExitButton", ci);
 
         _window.MainControl.FileListHeader = Translations.Get("FileListHeader", ci);
-        _window.MainControl.OutputFolderText = Translations.Get("OutputFolder", ci);
         _window.MainControl.AppTagline = Translations.Get("AppTagline", ci);
 
         _window.MainControl.StatusBar.TotalLabel = Translations.Get("StatusTotal", ci);
@@ -194,6 +196,10 @@ public partial class App : System.Windows.Application
 
         if (_window.MainControl.OptionsContent.Content is OptionsPanel panel)
             panel.ApplyLanguage(ci);
+
+        _window.MainControl.ChangeButtonText = Translations.Get("ChangeBtn", ci);
+        _window.FileListBox.RemoveMenuItemText = Translations.Get("RemoveBtn", ci);
+        _window.FileListBox.ClearAllMenuItemText = Translations.Get("ClearAllBtn", ci);
 
         _window.MainControl.UpdateCounters();
     }
@@ -223,6 +229,7 @@ public partial class App : System.Windows.Application
             {
                 item.Progress = progress;
                 item.StatusText = $"{progress}%";
+                _linkCollector?.UpdatePlaylistProgressFromChild(item);
                 _window.MainControl.UpdateCounters();
             });
         };
@@ -234,6 +241,7 @@ public partial class App : System.Windows.Application
                 item.Status = success ? FileStatus.Processed : FileStatus.Error;
                 item.StatusText = success ? "Completado" : "Error";
                 item.ProgressBarVisible = false;
+                _linkCollector?.UpdatePlaylistProgressFromChild(item);
                 _window.MainControl.UpdateCounters();
             });
 
@@ -259,14 +267,77 @@ public partial class App : System.Windows.Application
 
         _window.AboutClick += (_, _) =>
         {
+            var ci = _languageService.CurrentCulture;
+            var assemblyVer = System.Reflection.Assembly.GetEntryAssembly()
+                ?.GetName().Version;
+            var appVersion = assemblyVer != null
+                ? $"{assemblyVer.Major}.{assemblyVer.Minor}.{assemblyVer.Build}"
+                : "2.0.0";
             var about = new AboutDialog
             {
                 AppName = "TubeMassDL",
-                AppVersion = "v2.0.0",
+                AppVersion = $"v{appVersion}",
                 AppCopyright = "Copyright © 2026 NoCloudware",
                 ThirdPartyLicenses = "WPF-UI (MIT)\nCommunityToolkit.Mvvm (MIT)\nyt-dlp (Unlicense)",
+                DialogTitle = Translations.Get("AboutTitle", ci),
+                ThirdPartyHeader = Translations.Get("ThirdPartyHeader", ci),
+                CheckUpdatesText = Translations.Get("CheckUpdatesBtn", ci),
+                CloseButtonText = Translations.Get("CloseBtn", ci),
                 Owner = _window
             };
+
+            about.CheckUpdatesClick += async (s, e) =>
+            {
+                about.CheckUpdatesText = Translations.Get("CheckingUpdates", ci);
+                about.IsCheckUpdatesEnabled = false;
+                try
+                {
+                    var updateService = new AppUpdateService();
+                    var updateInfo = await updateService.CheckForUpdatesAsync();
+
+                    if (updateInfo == null)
+                    {
+                        about.CheckUpdatesText = Translations.Get("UpdateCheckFailed", ci);
+                        System.Windows.MessageBox.Show(
+                            Translations.Get("UpdateCheckFailed", ci),
+                            Translations.Get("AboutTitle", ci),
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    else if (updateInfo.IsNewerVersion)
+                    {
+                        string msg = string.Format(Translations.Get("UpdateAvailable", ci), updateInfo.Version);
+                        about.CheckUpdatesText = msg;
+                        var result = System.Windows.MessageBox.Show(
+                            msg + "\n\n" + Translations.Get("DownloadPrompt", ci),
+                            Translations.Get("AboutTitle", ci),
+                            MessageBoxButton.YesNo, MessageBoxImage.Information);
+                        if (result == MessageBoxResult.Yes)
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = updateInfo.DownloadUrl,
+                                UseShellExecute = true
+                            });
+                    }
+                    else
+                    {
+                        string msg = string.Format(Translations.Get("UpdateUpToDate", ci), $"v{appVersion}");
+                        about.CheckUpdatesText = msg;
+                        System.Windows.MessageBox.Show(
+                            msg,
+                            Translations.Get("AboutTitle", ci),
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch
+                {
+                    about.CheckUpdatesText = Translations.Get("UpdateCheckFailed", ci);
+                }
+                finally
+                {
+                    about.IsCheckUpdatesEnabled = true;
+                }
+            };
+
             about.ShowDialog();
         };
 
@@ -284,24 +355,27 @@ public partial class App : System.Windows.Application
 
         _window.ActionClick += (_, _) =>
         {
-            var selected = _linkCollector?.GetSelectedItems().ToList() ?? new List<BaseFileItem>();
-            if (selected.Count == 0)
+            // "Descargar todos": descarga TODOS los elementos sin importar selección
+            var allItems = _linkCollector?.Items
+                .Where(i => i.SourceText != "📁 Playlist" && i.Status is FileStatus.Queued or FileStatus.Error)
+                .ToList() ?? new List<BaseFileItem>();
+            if (allItems.Count == 0)
             {
-                LogMessage("No hay elementos seleccionados para descargar.");
+                LogMessage("No hay elementos para descargar.");
                 return;
             }
 
             if (_window.MainControl.OptionsContent.Content is not OptionsPanel panel) return;
             string outputPath = _window.MainControl.OutputFolderText;
             if (string.IsNullOrWhiteSpace(outputPath))
-                outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TubeMassDL");
+                outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Downloads", "TubeMassDL");
             Directory.CreateDirectory(outputPath);
 
             string format = panel.GetSelectedFormat();
             bool antiBlock = panel.AntiBlockEnabled;
             bool extractAudio = panel.ExtractAudio;
 
-            var tasks = selected.Select(item => new DownloadTask
+            var tasks = allItems.Select(item => new DownloadTask
             {
                 Item = item,
                 OutputPath = outputPath,
@@ -310,8 +384,9 @@ public partial class App : System.Windows.Application
                 ExtractAudio = extractAudio
             });
 
-            LogMessage($"Añadiendo {selected.Count} elemento(s) a la cola...");
+            LogMessage($"Añadiendo {allItems.Count} elemento(s) a la cola...");
             _downloadManager!.Enqueue(tasks);
+            panel.SetDownloadingState(true);
         };
 
         _window.ExitClick += (_, _) => _window.Close();
@@ -367,7 +442,7 @@ public partial class App : System.Windows.Application
 
         if (string.IsNullOrWhiteSpace(outputPath))
         {
-            outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TubeMassDL");
+            outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Downloads", "TubeMassDL");
             _window.MainControl.OutputFolderText = outputPath;
         }
         Directory.CreateDirectory(outputPath);

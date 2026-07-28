@@ -1,8 +1,7 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
-using NoCloudware.UI.Core.ViewModels;
-using TubeMassDL.Models;
 
 namespace TubeMassDL.Services;
 
@@ -83,8 +82,13 @@ public class YtDlpDownloader
                 args.Add("youtube:player_client=android,web");
             }
 
-            // Firefox cookies most compatible with yt-dlp
-            args.Add("--cookies-from-browser"); args.Add("firefox");
+            // Detect available browser cookies dynamically
+            var browser = BrowserCookieService.DetectAvailableBrowser();
+            string? usedBrowser = browser;
+            if (browser != null)
+            {
+                args.Add("--cookies-from-browser"); args.Add(browser);
+            }
 
             string? nodePath = GetNodePath();
             if (nodePath != null)
@@ -157,6 +161,7 @@ public class YtDlpDownloader
 
             string? capturedFile = null;
             string? mergedFile = null;
+            string stderrLog = "";
 
             var outputTask = Task.Run(async () =>
             {
@@ -180,15 +185,35 @@ public class YtDlpDownloader
                 }
             }, _cts?.Token ?? default);
 
+            var stderrTask = Task.Run(async () =>
+            {
+                var sb = new System.Text.StringBuilder();
+                while (!_currentProcess!.HasExited && !_cts!.Token.IsCancellationRequested)
+                {
+                    var line = await _currentProcess.StandardError.ReadLineAsync(_cts.Token);
+                    if (line == null) break;
+                    sb.AppendLine(line);
+                }
+                stderrLog = sb.ToString();
+            }, _cts?.Token ?? default);
+
             if (_currentProcess != null)
                 await _currentProcess.WaitForExitAsync(_cts?.Token ?? default);
-            await outputTask;
+            await Task.WhenAll(outputTask, stderrTask);
 
             bool ok = _currentProcess?.ExitCode == 0;
             string actualFile = mergedFile ?? capturedFile ?? "";
 
-            Completed?.Invoke(ok, ok ? null : "Download failed");
-            return (ok, ok ? actualFile : null, ok ? null : "Exit code non-zero");
+            string? errorMsg = null;
+            if (!ok)
+            {
+                errorMsg = DetectLoginError(stderrLog, usedBrowser);
+                if (errorMsg == null)
+                    errorMsg = "Exit code non-zero";
+            }
+
+            Completed?.Invoke(ok, ok ? null : errorMsg);
+            return (ok, ok ? actualFile : null, ok ? null : errorMsg);
         }
         catch (Exception ex)
         {
@@ -218,6 +243,46 @@ public class YtDlpDownloader
     {
         _cts?.Cancel();
         try { _currentProcess?.Kill(); } catch { }
+    }
+
+    private static string? DetectLoginError(string stderr, string? usedBrowser)
+    {
+        if (string.IsNullOrEmpty(stderr)) return null;
+
+        string lower = stderr.ToLowerInvariant();
+
+        bool isLoginError = lower.Contains("sign in") ||
+                            lower.Contains("sign in required") ||
+                            lower.Contains("login required") ||
+                            lower.Contains("private video") ||
+                            lower.Contains("this video is private") ||
+                            lower.Contains("http error 4") ||
+                            lower.Contains("confirm your identity") ||
+                            lower.Contains("confirm you are not a bot");
+
+        if (!isLoginError) return null;
+
+        if (usedBrowser == null)
+            return "LOGIN_REQUIRED_NO_COOKIES";
+
+        return "LOGIN_REQUIRED";
+    }
+
+    public static void CleanupPartFiles(string outputPath, string url)
+    {
+        try
+        {
+            if (!Directory.Exists(outputPath)) return;
+            foreach (var f in Directory.GetFiles(outputPath, "*.part"))
+            {
+                try { File.Delete(f); } catch { }
+            }
+            foreach (var f in Directory.GetFiles(outputPath, "*.ytdl"))
+            {
+                try { File.Delete(f); } catch { }
+            }
+        }
+        catch { }
     }
 
     private static string GetRequestedVideoExt(string format)

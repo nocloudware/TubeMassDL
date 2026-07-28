@@ -1,7 +1,10 @@
 using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using NoCloudware.UI.Core.Controls;
+using NoCloudware.UI.Core.ViewModels;
 using TubeMassDL.Models;
 using TubeMassDL.Services;
 
@@ -23,6 +26,16 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
         _downloadManager = downloadManager;
         _initialized = true;
         PopulateFormats(true);
+    }
+
+    private void OnConcurrentChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_initialized) return;
+        if (ConcurrentComboBox.SelectedItem is ComboBoxItem item &&
+            int.TryParse(item.Content?.ToString(), out int count))
+        {
+            _downloadManager.MaxConcurrent = count;
+        }
     }
 
     private void OnTypeChanged(object sender, SelectionChangedEventArgs e)
@@ -59,9 +72,37 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
 
     private void OnDownloadClick(object sender, RoutedEventArgs e)
     {
-        var win = Window.GetWindow(this) as ShellWindow;
-        if (win == null) return;
-        win.RaiseEvent(new RoutedEventArgs(BaseMainControl.ActionClickEvent));
+        var selected = _collector.Items
+            .Where(i => i.SourceText != "📁 Playlist" && i.IsSelected && i.Status is FileStatus.Queued or FileStatus.Error)
+            .ToList();
+        if (selected.Count == 0) return;
+
+        string outputPath = GetOutputPath();
+        string format = GetSelectedFormat();
+        bool antiBlock = AntiBlockEnabled;
+        bool extractAudio = ExtractAudio;
+
+        var tasks = selected.Select(item => new DownloadTask
+        {
+            Item = item,
+            OutputPath = outputPath,
+            Format = format,
+            AntiBlock = antiBlock,
+            ExtractAudio = extractAudio
+        });
+
+        _downloadManager.Enqueue(tasks);
+        SetDownloadingState(true);
+    }
+
+    private string GetOutputPath()
+    {
+        var shell = Window.GetWindow(this) as ShellWindow;
+        string? path = shell?.MainControl.OutputFolderText;
+        if (string.IsNullOrWhiteSpace(path))
+            path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Downloads\\TubeMassDL";
+        Directory.CreateDirectory(path);
+        return path;
     }
 
     private void OnPauseClick(object sender, RoutedEventArgs e)
@@ -69,22 +110,40 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
         if (_downloadManager.IsPaused)
         {
             _downloadManager.Resume();
-            PauseButton.Content = "PAUSAR";
+            PauseButton.Content = Translations.Get("PauseBtn");
         }
         else
         {
-            // Try to pause the currently processing item
-            _downloadManager.Pause();
-            PauseButton.Content = "REANUDAR";
+            // Pause selected items: cancel + requeue each processing selected item
+            var selected = _collector.Items
+                .Where(i => i.IsSelected && i.Status == FileStatus.Processing)
+                .ToList();
+            foreach (var item in selected)
+                _downloadManager.PauseAndRequeue(item);
+
+            if (selected.Count > 0)
+            {
+                _downloadManager.Pause();
+                PauseButton.Content = Translations.Get("ResumeBtn");
+            }
         }
-        StopButton.IsEnabled = true;
+        StopButton.IsEnabled = _downloadManager.IsRunning;
     }
 
     private void OnStopClick(object sender, RoutedEventArgs e)
     {
-        _downloadManager.Stop();
-        PauseButton.Content = "PAUSAR";
-        SetDownloadingState(false);
+        var selected = _collector.Items
+            .Where(i => i.IsSelected && (i.Status is FileStatus.Processing or FileStatus.Queued))
+            .ToList();
+        foreach (var item in selected)
+            _downloadManager.StopItem(item);
+
+        bool anyRunning = _collector.Items.Any(i => i.Status == FileStatus.Processing);
+        if (!anyRunning)
+        {
+            PauseButton.Content = Translations.Get("PauseBtn");
+            SetDownloadingState(false);
+        }
     }
 
     private void OnChangePathClick(object sender, RoutedEventArgs e)
@@ -98,16 +157,22 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
 
     public void ApplyLanguage(CultureInfo ci)
     {
-        CaptureLabel.Text = "📋 " + Translations.Get("CaptureLabel", ci);
+        CaptureToggle.Content = "📋 " + Translations.Get("CaptureLabel", ci);
         UrlLabel.Text = Translations.Get("UrlLabel", ci);
         TypeLabel.Text = Translations.Get("TypeLabel", ci);
         FormatLabel.Text = Translations.Get("FormatLabel", ci);
+        QualityLabel.Text = Translations.Get("QualityLabel", ci);
+        ConcurrentLabel.Text = Translations.Get("ConcurrentLabel", ci) + ":";
         if (TypeComboBox.Items.Count > 0 && TypeComboBox.Items[0] is ComboBoxItem type0)
             type0.Content = "🎬 " + Translations.Get("TypeVideo", ci);
         if (TypeComboBox.Items.Count > 1 && TypeComboBox.Items[1] is ComboBoxItem type1)
             type1.Content = "🎵 " + Translations.Get("TypeAudio", ci);
         AntiBlockCheckBox.Content = "🛡️ " + Translations.Get("AntiBlock", ci);
         DownloadButton.Content = Translations.Get("DownloadBtn", ci);
+        PauseButton.Content = _downloadManager.IsPaused
+            ? Translations.Get("ResumeBtn", ci)
+            : Translations.Get("PauseBtn", ci);
+        StopButton.Content = Translations.Get("StopBtn", ci);
     }
 
     public void SetDownloadingState(bool downloading)

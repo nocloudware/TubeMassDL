@@ -145,7 +145,6 @@ public class LinkCollector
     public void TogglePlaylist(BaseFileItem item)
     {
         if (item.SourceText != "📁 Playlist") return;
-        try { File.AppendAllText("toggle.log", $"[{DateTime.Now:HH:mm:ss}] Toggle: {item.FilePath}, expanded={_expandedPlaylists.Contains(item.FilePath)}\n"); } catch { }
 
         if (_expandedPlaylists.Contains(item.FilePath))
         {
@@ -155,7 +154,6 @@ public class LinkCollector
                 foreach (var child in children) Items.Remove(child);
                 _expandedPlaylists.Remove(item.FilePath);
                 item.ResultMessage = "+";
-                try { File.AppendAllText("toggle.log", $"  → Collapsed, removed {children.Count}\n"); } catch { }
             }
         }
         else
@@ -167,12 +165,10 @@ public class LinkCollector
                 var dummy = MakeItem(item.FilePath + "#dummy", "  ⚠️ Sin conexión a yt-dlp", "Error", true);
                 _playlistCache[item.FilePath] = new List<BaseFileItem> { dummy };
                 Items[Items.IndexOf(item)].FileName = $"📁 {pName} (1)";
-                try { File.AppendAllText("toggle.log", $"  → Dummy created\n"); } catch { }
             }
 
             if (_playlistCache.TryGetValue(item.FilePath, out var children))
             {
-                try { File.AppendAllText("toggle.log", $"  → Cache found, count={children.Count}\n"); } catch { }
                 var idx = Items.IndexOf(item);
                 if (idx >= 0)
                 {
@@ -197,7 +193,7 @@ public class LinkCollector
     public bool IsPlaylistExpanded(string url) => _expandedPlaylists.Contains(url);
 
     public IEnumerable<BaseFileItem> GetSelectedItems() =>
-        Items.Where(i => i.IsSelected && i.Status is FileStatus.Queued or FileStatus.Error);
+        Items.Where(i => i.SourceText != "📁 Playlist" && i.IsSelected && i.Status is FileStatus.Queued or FileStatus.Error);
 
     public IEnumerable<BaseFileItem> GetItemsByStatus(FileStatus status) =>
         Items.Where(i => i.Status == status);
@@ -216,6 +212,43 @@ public class LinkCollector
         Items.Clear();
         _playlistCache.Clear();
         _expandedPlaylists.Clear();
+    }
+
+    public void UpdatePlaylistProgressFromChild(BaseFileItem child)
+    {
+        foreach (var kvp in _playlistCache)
+        {
+            if (!kvp.Value.Contains(child)) continue;
+
+            var parent = Items.FirstOrDefault(i => i.FilePath == kvp.Key && i.SourceText == "📁 Playlist");
+            if (parent == null) return;
+
+            var children = kvp.Value;
+            if (children.Count == 0) return;
+
+            double avg = children.Average(c => (double)c.Progress);
+            parent.Progress = (int)avg;
+            parent.ProgressBarVisible = children.Any(c => c.Status == FileStatus.Processing);
+
+            int completed = children.Count(c => c.Status == FileStatus.Processed);
+            parent.StatusText = $"{completed}/{children.Count}";
+
+            if (completed == children.Count)
+            {
+                parent.Status = FileStatus.Processed;
+                parent.ProgressBarVisible = false;
+            }
+            else if (completed > 0 || children.Any(c => c.Status == FileStatus.Processing))
+            {
+                parent.Status = FileStatus.Processing;
+            }
+            else
+            {
+                parent.Status = FileStatus.Queued;
+                parent.ProgressBarVisible = false;
+            }
+            return;
+        }
     }
 
     public void RemoveItem(BaseFileItem item)
@@ -237,6 +270,8 @@ public class LinkCollector
                 {
                     kvp.Value.Remove(item);
                     Items.Remove(item);
+                    // Recalcular progreso del padre
+                    UpdatePlaylistProgressFromChild(item);
                     // Update parent count
                     var parent = Items.FirstOrDefault(i => i.FilePath == kvp.Key && i.SourceText == "📁 Playlist");
                     if (parent != null)

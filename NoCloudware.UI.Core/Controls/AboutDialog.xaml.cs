@@ -73,6 +73,12 @@ public partial class AboutDialog : Window
         DependencyProperty.Register(nameof(LogoImageHeight), typeof(double), typeof(AboutDialog),
             new PropertyMetadata(48.0));
 
+    public bool IsCheckUpdatesEnabled
+    {
+        get => CheckUpdatesButton?.IsEnabled ?? true;
+        set { if (CheckUpdatesButton != null) CheckUpdatesButton.IsEnabled = value; }
+    }
+
     public event RoutedEventHandler CheckUpdatesClick
     {
         add => AddHandler(CheckUpdatesClickEvent, value);
