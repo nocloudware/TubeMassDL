@@ -25,6 +25,7 @@ packages/
 
 # yt-dlp (already committed)
 !**/bin/yt-dlp.exe
+!TubeMassDL/yt-dlp.exe
 
 # Resources (keep)
 !**/Resources/*

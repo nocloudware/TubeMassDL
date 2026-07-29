@@ -83,7 +83,11 @@ public class LinkCollector
             if (!File.Exists(ytdlpPath))
             {
                 var (ok, _) = await _updater.CheckAndUpdateAsync();
-                if (!ok) return;
+                if (!ok)
+                {
+                    await ReplaceDummyWithError(playlistUrl, "  ⚠️ No se pudo descargar yt-dlp. Verifica tu conexión a internet.");
+                    return;
+                }
             }
 
             var psi = new ProcessStartInfo
@@ -97,11 +101,19 @@ public class LinkCollector
             };
 
             using var proc = Process.Start(psi);
-            if (proc == null) return;
+            if (proc == null)
+            {
+                await ReplaceDummyWithError(playlistUrl, "  ⚠️ Error al ejecutar yt-dlp.");
+                return;
+            }
 
             string json = await proc.StandardOutput.ReadToEndAsync();
             await proc.WaitForExitAsync();
-            if (string.IsNullOrWhiteSpace(json)) return;
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                await ReplaceDummyWithError(playlistUrl, "  ⚠️ No se pudo obtener la lista de reproducción. URL inválida o privada.");
+                return;
+            }
 
             var children = new List<BaseFileItem>();
             var lines = json.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -127,6 +139,7 @@ public class LinkCollector
                 catch { }
             }
 
+            var oldCache = _playlistCache.TryGetValue(playlistUrl, out var existing) ? existing.ToList() : new List<BaseFileItem>();
             _playlistCache[playlistUrl] = children;
             // Collapsed by default: don't insert children into Items
 
@@ -147,9 +160,8 @@ public class LinkCollector
                     // If playlist was already expanded (with dummy), replace dummy with real children
                     if (_expandedPlaylists.Contains(playlistUrl))
                     {
-                        // Remove existing dummy/children
-                        var existing = _playlistCache[playlistUrl];
-                        foreach (var c in existing) Items.Remove(c);
+                        // Remove existing oldCache items from display
+                        foreach (var c in oldCache.ToList()) Items.Remove(c);
 
                         // Insert real children
                         int idx = parentIndex;
@@ -158,6 +170,36 @@ public class LinkCollector
                     }
                 });
             }
+        }
+        catch (Exception ex)
+        {
+            await ReplaceDummyWithError(playlistUrl, $"  ⚠️ Error: {ex.Message}");
+        }
+    }
+
+    private async Task ReplaceDummyWithError(string playlistUrl, string errorMessage)
+    {
+        try
+        {
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var parent = Items.FirstOrDefault(i => i.FilePath == playlistUrl && i.SourceText == "📁 Playlist");
+                if (parent == null) return;
+
+                if (_expandedPlaylists.Contains(playlistUrl) && _playlistCache.TryGetValue(playlistUrl, out var existing))
+                {
+                    foreach (var c in existing.ToList()) Items.Remove(c);
+                }
+
+                var errorItem = MakeItem(playlistUrl + "#error", errorMessage, "Error", true);
+                _playlistCache[playlistUrl] = new List<BaseFileItem> { errorItem };
+
+                if (_expandedPlaylists.Contains(playlistUrl))
+                {
+                    int idx = Items.IndexOf(parent);
+                    if (idx >= 0) Items.Insert(idx + 1, errorItem);
+                }
+            });
         }
         catch { }
     }
