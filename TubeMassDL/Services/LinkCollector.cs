@@ -80,7 +80,11 @@ public class LinkCollector
         try
         {
             var ytdlpPath = _updater.GetBinaryPath();
-            if (!File.Exists(ytdlpPath)) return;
+            if (!File.Exists(ytdlpPath))
+            {
+                var (ok, _) = await _updater.CheckAndUpdateAsync();
+                if (!ok) return;
+            }
 
             var psi = new ProcessStartInfo
             {
@@ -135,8 +139,24 @@ public class LinkCollector
 
             if (parentIndex >= 0)
             {
-                Items[parentIndex].FileName = $"📁 {TruncateTitle(playlistUrl)} ({children.Count})";
-                Items[parentIndex].ResultMessage = "+";
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Items[parentIndex].FileName = $"📁 {TruncateTitle(playlistUrl)} ({children.Count})";
+                    Items[parentIndex].ResultMessage = "+";
+
+                    // If playlist was already expanded (with dummy), replace dummy with real children
+                    if (_expandedPlaylists.Contains(playlistUrl))
+                    {
+                        // Remove existing dummy/children
+                        var existing = _playlistCache[playlistUrl];
+                        foreach (var c in existing) Items.Remove(c);
+
+                        // Insert real children
+                        int idx = parentIndex;
+                        for (int j = 0; j < children.Count; j++)
+                            Items.Insert(idx + 1 + j, children[j]);
+                    }
+                });
             }
         }
         catch { }
@@ -161,8 +181,9 @@ public class LinkCollector
             // Expand - populate cache if needed
             if (!_playlistCache.ContainsKey(item.FilePath))
             {
+                _ = ExpandPlaylistAsync(item.FilePath);
                 var pName = TruncateTitle(item.FilePath);
-                var dummy = MakeItem(item.FilePath + "#dummy", "  ⚠️ Sin conexión a yt-dlp", "Error", true);
+                var dummy = MakeItem(item.FilePath + "#dummy", "  ⏳ Cargando lista de reproducción...", "Cargando", true);
                 _playlistCache[item.FilePath] = new List<BaseFileItem> { dummy };
                 Items[Items.IndexOf(item)].FileName = $"📁 {pName} (1)";
             }

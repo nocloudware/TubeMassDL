@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using NoCloudware.UI.Core.Controls;
 using NoCloudware.UI.Core.Services;
 using NoCloudware.UI.Core.ViewModels;
@@ -111,7 +112,12 @@ public partial class App : System.Windows.Application
     private void InitUpdater()
     {
         _updater = new YtdlpUpdater();
-        _ = InitializeUpdaterAsync();
+        try
+        {
+            var task = Task.Run(() => InitializeUpdaterAsync());
+            task.Wait(TimeSpan.FromSeconds(30));
+        }
+        catch { }
     }
 
     private void InitWindow()
@@ -273,14 +279,33 @@ public partial class App : System.Windows.Application
             var appVersion = assemblyVer != null
                 ? $"{assemblyVer.Major}.{assemblyVer.Minor}.{assemblyVer.Build}"
                 : "1.0.0";
+
+            var logo = new BitmapImage();
+            logo.BeginInit();
+            logo.UriSource = new Uri("pack://application:,,,/TubeMassDL;component/Resources/tubemassdl-logo.png");
+            logo.CacheOption = BitmapCacheOption.OnLoad;
+            logo.EndInit();
+
             var about = new AboutDialog
             {
                 AppName = "TubeMassDL",
-                AppVersion = $"v{appVersion}",
-                AppCopyright = "Copyright © 2026 NoCloudware",
-                ThirdPartyLicenses = "WPF-UI (MIT)\nCommunityToolkit.Mvvm (MIT)\nyt-dlp (Unlicense)",
+                AppVersion = $"{Translations.Get("AboutVersion", ci)} v{appVersion}",
+                AppLogo = logo,
                 DialogTitle = Translations.Get("AboutTitle", ci),
-                ThirdPartyHeader = Translations.Get("ThirdPartyHeader", ci),
+                CreditsHeader = Translations.Get("AboutCredits", ci),
+                DevelopedByText = Translations.Get("AboutDevelopedBy", ci),
+                DeveloperName = Translations.Get("AboutDeveloperName", ci),
+                DeveloperUrl = "https://www.nocloudware.com",
+                ThirdPartyLibrariesText = Translations.Get("AboutThirdPartyLibraries", ci),
+                YtDlpDesc = Translations.Get("AboutYtDlpDesc", ci),
+                WpfUiDesc = Translations.Get("AboutWpfUiDesc", ci),
+                MvvmDesc = Translations.Get("AboutMvvmDesc", ci),
+                SpecialThanksText = Translations.Get("AboutSpecialThanks", ci),
+                SpecialThanksMessage = Translations.Get("AboutSpecialThanksMessage", ci),
+                TechnologiesUsedText = Translations.Get("AboutTechnologiesUsed", ci),
+                TechList = Translations.Get("AboutTechList", ci),
+                LicenseText = Translations.Get("AboutLicense", ci),
+                LicenseInfo = Translations.Get("AboutLicenseInfo", ci),
                 CheckUpdatesText = Translations.Get("CheckUpdatesBtn", ci),
                 CloseButtonText = Translations.Get("CloseBtn", ci),
                 Owner = _window

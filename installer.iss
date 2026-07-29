@@ -1,13 +1,13 @@
 [Setup]
 AppName=TubeMassDL
-AppVersion=1.0.0
+AppVersion=1.1.0
 AppPublisher=NoCloudware
-AppPublisherURL=https://nocloudware.com
+AppPublisherURL=https://www.nocloudware.com
 AppSupportURL=https://github.com/nocloudware/TubeMassDL/issues
 DefaultDirName={autopf}\TubeMassDL
 DefaultGroupName=TubeMassDL
 OutputDir=.
-OutputBaseFilename=TubeMassDL-1.0.0-Setup
+OutputBaseFilename=TubeMassDL-1.1.0-Setup
 Compression=lzma2/max
 SolidCompression=yes
 UninstallDisplayIcon={app}\TubeMassDL.exe
