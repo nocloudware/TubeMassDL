@@ -649,6 +649,11 @@ public partial class BaseMainControl : UserControl
         RaiseEvent(new RoutedEventArgs(AboutClickEvent));
     }
 
+    private void OnLogClick(object sender, RoutedEventArgs e)
+    {
+        new LogWindow { Owner = Window.GetWindow(this) }.Show();
+    }
+
     private void OnDonateClick(object sender, RoutedEventArgs e)
     {
         RaiseEvent(new RoutedEventArgs(DonateClickEvent));

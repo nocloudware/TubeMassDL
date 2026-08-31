@@ -190,6 +190,15 @@
                     </ui:Button.Icon>
                 </ui:Button>
 
+                <ui:Button Click="OnLogClick"
+                           Appearance="Transparent"
+                           Padding="6,4"
+                           ToolTip="Log de la sesión">
+                    <ui:Button.Icon>
+                        <ui:SymbolIcon Symbol="Document24"/>
+                    </ui:Button.Icon>
+                </ui:Button>
+
                 <ui:Button Click="OnDonateClick"
                            Appearance="Transparent"
                            Padding="6,4"

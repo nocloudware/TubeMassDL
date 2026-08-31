@@ -1,0 +1,75 @@
+<Window x:Class="NoCloudware.UI.Core.Controls.LogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:diag="clr-namespace:NoCloudware.UI.Core.Diagnostics"
+        Title="Log de la sesión"
+        Width="760" Height="500"
+        MinWidth="480" MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        ShowInTaskbar="False"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        KeyDown="OnKeyDown">
+
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Style="{DynamicResource CardStyle}"
+                Padding="4">
+            <ListBox Background="Transparent"
+                     BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ItemsSource="{Binding Source={x:Static diag:SessionLog.Entries}}">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="6,3"/>
+                        <Setter Property="IsHitTestVisible" Value="False"/>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="0,2">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Time, StringFormat='HH:mm:ss'}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,0,8,0"
+                                           VerticalAlignment="Top"/>
+                                <TextBlock Text="{Binding Message}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Detail}"
+                                       FontSize="11"
+                                       FontFamily="Consolas"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="44,1,0,0"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <ui:Button Content="Limpiar"
+                       Appearance="Secondary"
+                       Padding="16,6"
+                       Margin="0,0,8,0"
+                       Click="OnClearClick"/>
+            <Button Content="Cerrar"
+                    Style="{DynamicResource PrimaryButtonStyle}"
+                    Padding="20,8"
+                    Click="OnCloseClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

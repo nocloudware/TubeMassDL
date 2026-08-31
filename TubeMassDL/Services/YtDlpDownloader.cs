@@ -211,7 +211,9 @@ public class YtDlpDownloader
             {
                 errorMsg = DetectLoginError(stderrLog, usedBrowser);
                 if (errorMsg == null)
-                    errorMsg = "Exit code non-zero";
+                    errorMsg = GetStderrError(stderrLog) ?? "Exit code non-zero";
+                if (!string.IsNullOrWhiteSpace(stderrLog))
+                    Log?.Invoke(stderrLog.Trim());
             }
 
             Completed?.Invoke(ok, ok ? null : errorMsg);
@@ -245,6 +247,22 @@ public class YtDlpDownloader
     {
         _cts?.Cancel();
         try { _currentProcess?.Kill(); } catch { }
+    }
+
+    private static string? GetStderrError(string stderr)
+    {
+        if (string.IsNullOrWhiteSpace(stderr)) return null;
+
+        var lines = stderr.Split('\n');
+        for (int i = lines.Length - 1; i >= 0; i--)
+        {
+            var line = lines[i].Trim();
+            if (line.Length == 0) continue;
+            if (line.IndexOf("ERROR", StringComparison.OrdinalIgnoreCase) >= 0)
+                return line.Length > 300 ? line[..300] : line;
+        }
+        var last = lines[^1].Trim();
+        return last.Length > 300 ? last[..300] : last;
     }
 
     private static string? DetectLoginError(string stderr, string? usedBrowser)

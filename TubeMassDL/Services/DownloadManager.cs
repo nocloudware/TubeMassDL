@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using NoCloudware.UI.Core.Diagnostics;
 using NoCloudware.UI.Core.ViewModels;
 
 namespace TubeMassDL.Services;
@@ -193,6 +194,8 @@ public class DownloadManager
 
         bool success = false;
 
+        SessionLog.Add("Descargando: " + item.FilePath);
+
         try
         {
             if (site.IsDirectFile)
@@ -206,6 +209,7 @@ public class DownloadManager
             {
                 var ytdlp = new YtDlpDownloader(_updater.GetBinaryPath());
                 ytdlp.ProgressUpdated += p => ReportProgress(p);
+                ytdlp.Log += msg => SessionLog.Add(msg);
                 var (ok, _, err) = await ytdlp.DownloadAsync(item.FilePath, task.OutputPath,
                     task.Format, task.AntiBlock, task.ExtractAudio, ct);
                 success = ok;
@@ -226,6 +230,11 @@ public class DownloadManager
             item.ResultMessage = ex.Message;
             success = false;
         }
+
+        if (success)
+            SessionLog.Add("✓ " + item.FilePath);
+        else
+            SessionLog.Add("✗ " + item.FilePath, item.ResultMessage);
 
         item.ProgressBarVisible = false;
         item.Status = success ? FileStatus.Processed : FileStatus.Error;
