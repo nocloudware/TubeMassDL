@@ -159,7 +159,6 @@ public partial class BaseMainControl : UserControl
             new PropertyMetadata(null, OnTipsListChanged));
 
     private int _tipsIndex;
-    private LogWindow? _logWindow;
 
     // ── Donate visibility DP ──────────────────────────────────────────
 
@@ -654,14 +653,11 @@ public partial class BaseMainControl : UserControl
     {
         try
         {
-            if (_logWindow is { IsVisible: true })
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                _logWindow.Activate();
-                return;
-            }
-            _logWindow = new LogWindow { Owner = Window.GetWindow(this) };
-            _logWindow.ShowDialog();
-            _logWindow = null;
+                FileName = NoCloudware.UI.Core.Diagnostics.SessionLog.LogFilePath,
+                UseShellExecute = true
+            });
         }
         catch (Exception ex)
         {
