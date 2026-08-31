@@ -651,7 +651,14 @@ public partial class BaseMainControl : UserControl
 
     private void OnLogClick(object sender, RoutedEventArgs e)
     {
-        new LogWindow { Owner = Window.GetWindow(this) }.Show();
+        try
+        {
+            new LogWindow { Owner = Window.GetWindow(this) }.Show();
+        }
+        catch (Exception ex)
+        {
+            NoCloudware.UI.Core.Diagnostics.SessionLog.Add("Error al abrir el log: " + ex.Message, ex.ToString());
+        }
     }
 
     private void OnDonateClick(object sender, RoutedEventArgs e)

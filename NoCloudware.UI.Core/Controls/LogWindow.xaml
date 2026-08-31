@@ -67,7 +67,7 @@
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        VerticalAlignment="Center"
                        Margin="0,0,6,0"/>
-            <TextBox Text="{Binding Source={x:Static diag:SessionLog.LogFilePath}}"
+            <TextBox Text="{Binding Source={x:Static diag:SessionLog.LogFilePath}, Mode=OneWay}"
                      IsReadOnly="True"
                      Background="Transparent"
                      BorderThickness="0"
