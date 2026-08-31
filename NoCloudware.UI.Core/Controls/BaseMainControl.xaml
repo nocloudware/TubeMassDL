@@ -143,8 +143,21 @@
                     <!-- Status + Progress bar centered within file-list column -->
                     <Border Grid.Row="4" Background="Transparent" Padding="0,8,0,0">
                         <StackPanel HorizontalAlignment="Center">
-                            <controls:StatusBar x:Name="StatusBarControl"
-                                                HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <controls:StatusBar x:Name="StatusBarControl"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"/>
+                                <ui:Button Click="OnLogClick"
+                                           Appearance="Transparent"
+                                           Padding="4,4"
+                                           Margin="8,0,0,0"
+                                           ToolTip="Log de la sesión"
+                                           VerticalAlignment="Center">
+                                    <ui:Button.Icon>
+                                        <ui:SymbolIcon Symbol="Document24"/>
+                                    </ui:Button.Icon>
+                                </ui:Button>
+                            </StackPanel>
                             <ProgressBar Value="{Binding GlobalProgress, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                          Maximum="{Binding GlobalProgressMax, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                          Visibility="{Binding GlobalProgressVisible, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -187,15 +200,6 @@
                            Content="{Binding AboutButtonText, RelativeSource={RelativeSource AncestorType=UserControl}}">
                     <ui:Button.Icon>
                         <ui:SymbolIcon Symbol="Info20"/>
-                    </ui:Button.Icon>
-                </ui:Button>
-
-                <ui:Button Click="OnLogClick"
-                           Appearance="Transparent"
-                           Padding="6,4"
-                           ToolTip="Log de la sesión">
-                    <ui:Button.Icon>
-                        <ui:SymbolIcon Symbol="Document24"/>
                     </ui:Button.Icon>
                 </ui:Button>
 
