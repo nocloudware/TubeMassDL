@@ -34,7 +34,7 @@
         </ListBox.ItemContainerStyle>
         <ListBox.ItemTemplate>
             <DataTemplate>
-                <Grid Margin="0" MinHeight="20">
+                <Grid Margin="0,0,16,0" MinHeight="20">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="40"/>
