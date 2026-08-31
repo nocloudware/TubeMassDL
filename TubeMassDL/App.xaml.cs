@@ -234,25 +234,25 @@ public partial class App : System.Windows.Application
 
         _downloadManager.ItemProgress += (item, progress) =>
         {
-            _window?.Dispatcher.Invoke(() =>
+            _window?.Dispatcher.BeginInvoke(new Action(() =>
             {
                 item.Progress = progress;
                 item.StatusText = $"{progress}%";
                 _linkCollector?.UpdatePlaylistProgressFromChild(item);
                 _window.MainControl.UpdateCounters();
-            });
+            }));
         };
 
         _downloadManager.ItemCompleted += (item, success) =>
         {
-            _window?.Dispatcher.Invoke(() =>
+            _window?.Dispatcher.BeginInvoke(new Action(() =>
             {
                 item.Status = success ? FileStatus.Processed : FileStatus.Error;
                 item.StatusText = success ? "Completado" : "Error";
                 item.ProgressBarVisible = false;
                 _linkCollector?.UpdatePlaylistProgressFromChild(item);
                 _window.MainControl.UpdateCounters();
-            });
+            }));
 
             LogMessage(success ? $"Completado: {item.FileName}" : $"Error: {item.FileName}");
             if (_window != null) TaskbarFlashService.Flash(_window);
@@ -260,10 +260,10 @@ public partial class App : System.Windows.Application
 
         _downloadManager.AllCompleted += () =>
         {
-            _window?.Dispatcher.Invoke(() =>
+            _window?.Dispatcher.BeginInvoke(new Action(() =>
             {
                 _window.MainControl.UpdateCounters();
-            });
+            }));
 
             LogMessage("Todas las descargas completadas.");
             if (_window != null) TaskbarFlashService.Flash(_window);
@@ -638,7 +638,7 @@ public partial class App : System.Windows.Application
 
     private void SyncQueueToWindow()
     {
-        _window?.Dispatcher.Invoke(() =>
+        _window?.Dispatcher.BeginInvoke(new Action(() =>
         {
             var items = _linkCollector?.Items;
             if (items == null) return;
@@ -646,6 +646,6 @@ public partial class App : System.Windows.Application
             foreach (var item in items)
                 _window.Files.Add(item);
             _window.MainControl.UpdateCounters();
-        });
+        }));
     }
 }
