@@ -153,7 +153,7 @@ public class LinkCollector
 
             if (parentIndex >= 0)
             {
-                System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     Items[parentIndex].FileName = $"📁 {TruncateTitle(playlistUrl)} ({children.Count})";
                     Items[parentIndex].ResultMessage = "+";
