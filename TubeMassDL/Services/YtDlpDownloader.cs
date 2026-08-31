@@ -171,6 +171,7 @@ public class YtDlpDownloader
             });
 
             _currentProcess.Start();
+            Log?.Invoke($"yt-dlp iniciado (pid {_currentProcess.Id}): {url}");
 
             string? capturedFile = null;
             string? mergedFile = null;
@@ -213,6 +214,7 @@ public class YtDlpDownloader
             if (_currentProcess != null)
                 await _currentProcess.WaitForExitAsync(_cts?.Token ?? default);
             await Task.WhenAll(outputTask, stderrTask);
+            Log?.Invoke($"yt-dlp finalizó (exit {_currentProcess?.ExitCode})");
 
             bool ok = _currentProcess?.ExitCode == 0;
             string actualFile = mergedFile ?? capturedFile ?? "";
