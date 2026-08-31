@@ -63,6 +63,7 @@ public partial class App : System.Windows.Application
             LogMessage("TubeMassDL v1.0 iniciado.");
             _window!.Show();
             _ = CheckForAppUpdateAsync();
+            _ = ValidateJsRuntimeAsync();
         }
         catch (Exception ex)
         {
@@ -553,6 +554,32 @@ public partial class App : System.Windows.Application
                     MessageBoxButton.YesNo, MessageBoxImage.Information);
                 if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(info.DownloadAssetUrl))
                     _ = DownloadAndRunInstallerAsync(info.DownloadAssetUrl);
+            });
+        }
+        catch { }
+    }
+
+    private async Task ValidateJsRuntimeAsync()
+    {
+        await Task.Delay(1500);
+        try
+        {
+            if (YtDlpDownloader.GetNodePath() != null) return;
+            var ci = _languageService.CurrentCulture;
+            await _window!.Dispatcher.InvokeAsync(() =>
+            {
+                var result = System.Windows.MessageBox.Show(
+                    Translations.Get("NodeRequiredMsg", ci),
+                    Translations.Get("AboutTitle", ci),
+                    MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo { FileName = "https://nodejs.org", UseShellExecute = true });
+                    }
+                    catch { }
+                }
             });
         }
         catch { }

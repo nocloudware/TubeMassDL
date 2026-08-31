@@ -99,6 +99,13 @@ public class YtDlpDownloader
                 args.Add($"node:{nodePath}");
             }
 
+            string? ffmpegDir = FindFfmpegDir();
+            if (ffmpegDir != null)
+            {
+                args.Add("--ffmpeg-location");
+                args.Add(ffmpegDir);
+            }
+
             if (antiBlock)
             {
                 var rng = new Random();
@@ -150,6 +157,10 @@ public class YtDlpDownloader
                 StandardOutputEncoding = System.Text.Encoding.UTF8
             };
             foreach (var a in args) psi.ArgumentList.Add(a);
+
+            // Use a controlled PATH so yt-dlp never scans the user's full PATH
+            // (which may contain untrusted junctions like Codex's -> WinError 448).
+            psi.Environment["PATH"] = BuildControlledPath(_ytdlpPath, nodePath, ffmpegDir);
 
             _currentProcess = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
@@ -312,7 +323,7 @@ public class YtDlpDownloader
         return match.Success ? match.Groups[1].Value : "";
     }
 
-    private static string? GetNodePath()
+    public static string? GetNodePath()
     {
         string[] paths = {
             @"C:\Program Files\nodejs\node.exe",
@@ -321,7 +332,44 @@ public class YtDlpDownloader
                 "Programs", "Nodejs", "node.exe")
         };
         foreach (var p in paths)
-            if (File.Exists(p)) return p;
+        {
+            try { if (File.Exists(p)) return p; } catch { }
+        }
         return null;
+    }
+
+    private static string? FindFfmpegDir()
+    {
+        var candidates = new List<string>();
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        if (!string.IsNullOrEmpty(path))
+            candidates.AddRange(path.Split(';', StringSplitOptions.RemoveEmptyEntries));
+        candidates.Add(Path.GetDirectoryName(Environment.ProcessPath) ?? "");
+
+        foreach (var dir in candidates)
+        {
+            if (string.IsNullOrWhiteSpace(dir)) continue;
+            try
+            {
+                if (File.Exists(Path.Combine(dir.Trim(), "ffmpeg.exe")))
+                    return dir.Trim();
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    public static string BuildControlledPath(string ytdlpPath, string? nodePath, string? ffmpegDir)
+    {
+        var dirs = new List<string>();
+        string? ytDir = Path.GetDirectoryName(ytdlpPath);
+        if (!string.IsNullOrEmpty(ytDir)) dirs.Add(ytDir);
+        if (!string.IsNullOrEmpty(nodePath)) dirs.Add(Path.GetDirectoryName(nodePath) ?? "");
+        if (!string.IsNullOrEmpty(ffmpegDir)) dirs.Add(ffmpegDir);
+        string sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        dirs.Add(sys);
+        string? sysRoot = Path.GetDirectoryName(sys);
+        if (!string.IsNullOrEmpty(sysRoot)) dirs.Add(sysRoot);
+        return string.Join(";", dirs.Where(d => !string.IsNullOrWhiteSpace(d)).Distinct());
     }
 }

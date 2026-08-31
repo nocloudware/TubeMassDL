@@ -99,6 +99,7 @@ public class LinkCollector
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
+            psi.Environment["PATH"] = YtDlpDownloader.BuildControlledPath(ytdlpPath, null, null);
 
             using var proc = Process.Start(psi);
             if (proc == null)
