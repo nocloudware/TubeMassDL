@@ -88,27 +88,28 @@ Full application theme support via WPF-UI and custom Aether theme dictionaries. 
 - **Double-click Downloading item** — Pause and requeue at the end
 
 ### App Update Checker
-- Checks the **TubeMassDL** GitHub releases page for new app versions (not yt-dlp)
-- Shows "Update available" with version number and download prompt
+- Checks the **TubeMassDL** GitHub releases page for new app versions **automatically on startup**
+- Shows "Update available" with the version number; accepting it **downloads the installer directly and launches it** (the app closes to allow installation)
+- Also available from the About dialog
 - Falls back gracefully on network errors
-- Built into the About dialog
 
 ### yt-dlp Auto-Update
 On startup, the app checks GitHub for the latest `yt-dlp.exe` release and auto-downloads it.
+- The installer is **per-user** (`%LOCALAPPDATA%\Programs\TubeMassDL`), so the app can update its own binary without admin rights
+- The yt-dlp child process runs with a **controlled PATH** (app dir + Node.js + ffmpeg + System32), so it never scans the user's full PATH (avoids untrusted-junction errors such as WinError 448)
+- ffmpeg is resolved explicitly via `--ffmpeg-location`
+- **Node.js** is required for YouTube downloads (JS runtime for the n-sig challenge); the app validates it on startup and offers a link to nodejs.org if missing
+
+### Session Log
+- Every session is logged to `%LOCALAPPDATA%\TubeMassDL\session.log`
+- The log button (next to the status bar) opens the file in the system editor
+- Includes download start/end, the yt-dlp process lifecycle (PID / exit code), full yt-dlp stderr on errors, and retries
 
 ### Output Path
 Default download folder: `%USERPROFILE%\Downloads\TubeMassDL` (changeable via folder picker or manual edit). Persisted across sessions.
 
 ### Part-File Cleanup
 `.part` and `.ytdl` temporary files are automatically cleaned up on permanent failure or explicit stop, but preserved on cancel/resume to allow yt-dlp resumption.
-
-## Screenshots
-
-| English Dark | English Light |
-|:---:|:---:|
-| ![en_dark](en_dark.png) | ![en_light](en_light.png) |
-| **Spanish Dark** | **Spanish Light** |
-| ![es_dark](es_dark.png) | ![es_light](es_light.png) |
 
 ## Architecture
 
@@ -172,6 +173,8 @@ TubeMassDL/
     │   ├── ThemeService.cs              # ApplicationThemeManager + Aether swap
     │   ├── LanguageService.cs           # Culture detection + switching
     │   └── DonationService.cs           # Opens donation URL in browser
+    ├── Diagnostics/
+    │   └── SessionLog.cs                # Session log → %LOCALAPPDATA%\TubeMassDL\session.log
     └── ViewModels/
         ├── BaseFileItem.cs              # Observable item model (CommunityToolkit.Mvvm)
         └── BaseFileItem.Commands.cs     # Delete + toggle playlist commands
@@ -181,8 +184,9 @@ TubeMassDL/
 
 ### Prerequisites
 - .NET 8.0 SDK (Windows)
-- `yt-dlp.exe` — auto-downloaded on first run (or place manually in the output directory)
+- **Node.js** — required for YouTube downloads (JS runtime for the n-sig challenge); the app validates it on startup and offers a link to nodejs.org if missing
 - A browser with session cookies (Chrome, Edge, or Firefox) for authenticated content
+- ffmpeg on the PATH (used for audio extraction / container fixes)
 
 ### Build & Run
 ```bash
