@@ -159,6 +159,7 @@ public partial class BaseMainControl : UserControl
             new PropertyMetadata(null, OnTipsListChanged));
 
     private int _tipsIndex;
+    private LogWindow? _logWindow;
 
     // ── Donate visibility DP ──────────────────────────────────────────
 
@@ -653,7 +654,14 @@ public partial class BaseMainControl : UserControl
     {
         try
         {
-            new LogWindow { Owner = Window.GetWindow(this) }.Show();
+            if (_logWindow is { IsVisible: true })
+            {
+                _logWindow.Activate();
+                return;
+            }
+            _logWindow = new LogWindow { Owner = Window.GetWindow(this) };
+            _logWindow.ShowDialog();
+            _logWindow = null;
         }
         catch (Exception ex)
         {
