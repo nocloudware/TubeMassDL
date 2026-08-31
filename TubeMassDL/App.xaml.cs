@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
@@ -61,6 +62,7 @@ public partial class App : System.Windows.Application
 
             LogMessage("TubeMassDL v1.0 iniciado.");
             _window!.Show();
+            _ = CheckForAppUpdateAsync();
         }
         catch (Exception ex)
         {
@@ -337,11 +339,21 @@ public partial class App : System.Windows.Application
                             Translations.Get("AboutTitle", ci),
                             MessageBoxButton.YesNo, MessageBoxImage.Information);
                         if (result == MessageBoxResult.Yes)
-                            Process.Start(new ProcessStartInfo
+                        {
+                            if (!string.IsNullOrEmpty(updateInfo.DownloadAssetUrl))
                             {
-                                FileName = updateInfo.DownloadUrl,
-                                UseShellExecute = true
-                            });
+                                about.CheckUpdatesText = Translations.Get("DownloadingUpdate", ci);
+                                await DownloadAndRunInstallerAsync(updateInfo.DownloadAssetUrl);
+                            }
+                            else
+                            {
+                                Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = updateInfo.DownloadUrl,
+                                    UseShellExecute = true
+                                });
+                            }
+                        }
                     }
                     else
                     {
@@ -481,6 +493,55 @@ public partial class App : System.Windows.Application
             AntiBlock = antiBlock,
             ExtractAudio = extractAudio
         });
+    }
+
+    private async Task CheckForAppUpdateAsync()
+    {
+        try
+        {
+            var updateService = new AppUpdateService();
+            var info = await updateService.CheckForUpdatesAsync();
+            if (info == null || !info.IsNewerVersion) return;
+
+            var ci = _languageService.CurrentCulture;
+            await _window!.Dispatcher.InvokeAsync(() =>
+            {
+                string msg = string.Format(Translations.Get("UpdateAvailable", ci), info.Version)
+                    + "\n\n" + Translations.Get("DownloadPrompt", ci);
+                var result = System.Windows.MessageBox.Show(
+                    msg,
+                    Translations.Get("AboutTitle", ci),
+                    MessageBoxButton.YesNo, MessageBoxImage.Information);
+                if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(info.DownloadAssetUrl))
+                    _ = DownloadAndRunInstallerAsync(info.DownloadAssetUrl);
+            });
+        }
+        catch { }
+    }
+
+    private static async Task DownloadAndRunInstallerAsync(string url)
+    {
+        string dest = Path.Combine(Path.GetTempPath(), "TubeMassDL-Setup.exe");
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            using (var resp = await http.GetAsync(url))
+            {
+                resp.EnsureSuccessStatusCode();
+                using var fs = File.Create(dest);
+                await resp.Content.CopyToAsync(fs);
+            }
+            Process.Start(new ProcessStartInfo { FileName = dest, UseShellExecute = true });
+            System.Windows.Application.Current.Shutdown();
+        }
+        catch
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            }
+            catch { }
+        }
     }
 
     private void WireWindowClose()

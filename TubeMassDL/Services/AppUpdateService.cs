@@ -10,6 +10,7 @@ public class AppUpdateInfo
     public string TagName { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public string DownloadUrl { get; set; } = string.Empty;
+    public string DownloadAssetUrl { get; set; } = string.Empty;
     public string ReleaseNotes { get; set; } = string.Empty;
     public bool IsNewerVersion { get; set; }
 }
@@ -53,6 +54,20 @@ public class AppUpdateService
             var downloadUrl = release.GetProperty("html_url").GetString() ?? "";
             var releaseNotes = release.GetProperty("body").GetString() ?? "";
 
+            var assetUrl = "";
+            if (release.TryGetProperty("assets", out var assets))
+            {
+                foreach (var asset in assets.EnumerateArray())
+                {
+                    var name = asset.GetProperty("name").GetString() ?? "";
+                    if (name.EndsWith("-Setup.exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        assetUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
+                        break;
+                    }
+                }
+            }
+
             var currentVersion = Assembly.GetEntryAssembly()
                 ?.GetName().Version?.ToString() ?? "0.0.0";
 
@@ -61,6 +76,7 @@ public class AppUpdateService
                 TagName = tagName,
                 Version = version,
                 DownloadUrl = downloadUrl,
+                DownloadAssetUrl = assetUrl,
                 ReleaseNotes = releaseNotes,
                 IsNewerVersion = IsNewerVersion(version, currentVersion)
             };
