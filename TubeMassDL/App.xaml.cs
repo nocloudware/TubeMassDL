@@ -269,6 +269,41 @@ public partial class App : System.Windows.Application
         };
     }
 
+    private static string? GetAssemblyVersion(string assemblyName)
+    {
+        try
+        {
+            var asm = AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(a => a.GetName().Name == assemblyName);
+            asm ??= System.Reflection.Assembly.Load(assemblyName);
+            var v = asm.GetName().Version;
+            if (v == null) return null;
+            return v.Build != 0 ? $"{v.Major}.{v.Minor}.{v.Build}" : $"{v.Major}.{v.Minor}";
+        }
+        catch { return null; }
+    }
+
+    private static string? GetYtDlpVersion(string path)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = path,
+                Arguments = "--version",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null) return null;
+            string v = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+            return v.Trim();
+        }
+        catch { return null; }
+    }
+
     private void WireShellEvents()
     {
         if (_window == null) return;
@@ -288,6 +323,10 @@ public partial class App : System.Windows.Application
             logo.CacheOption = BitmapCacheOption.OnLoad;
             logo.EndInit();
 
+            var wpfUiVersion = GetAssemblyVersion("Wpf.Ui");
+            var mvvmVersion = GetAssemblyVersion("CommunityToolkit.Mvvm");
+            var ytDlpVersion = GetYtDlpVersion(_updater!.GetBinaryPath());
+
             var about = new AboutDialog
             {
                 AppName = "TubeMassDL",
@@ -299,9 +338,9 @@ public partial class App : System.Windows.Application
                 DeveloperName = Translations.Get("AboutDeveloperName", ci),
                 DeveloperUrl = "https://www.nocloudware.com",
                 ThirdPartyLibrariesText = Translations.Get("AboutThirdPartyLibraries", ci),
-                YtDlpDesc = Translations.Get("AboutYtDlpDesc", ci),
-                WpfUiDesc = Translations.Get("AboutWpfUiDesc", ci),
-                MvvmDesc = Translations.Get("AboutMvvmDesc", ci),
+                YtDlpDesc = Translations.Get("AboutYtDlpDesc", ci) + (ytDlpVersion != null ? $" (v{ytDlpVersion})" : ""),
+                WpfUiDesc = Translations.Get("AboutWpfUiDesc", ci) + (wpfUiVersion != null ? $" (v{wpfUiVersion})" : ""),
+                MvvmDesc = Translations.Get("AboutMvvmDesc", ci) + (mvvmVersion != null ? $" (v{mvvmVersion})" : ""),
                 SpecialThanksText = Translations.Get("AboutSpecialThanks", ci),
                 SpecialThanksMessage = Translations.Get("AboutSpecialThanksMessage", ci),
                 TechnologiesUsedText = Translations.Get("AboutTechnologiesUsed", ci),
