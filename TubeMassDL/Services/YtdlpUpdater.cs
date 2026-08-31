@@ -15,7 +15,7 @@ public class YtdlpUpdater
     public YtdlpUpdater()
     {
         _ytdlpPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "yt-dlp.exe");
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("TubeMassDL/2.0");
     }
 

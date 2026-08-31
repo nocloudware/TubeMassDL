@@ -76,10 +76,12 @@ public class YtDlpDownloader
         {
             var args = new List<string>();
 
-            if (format.Contains("video"))
+            if (url.Contains("youtube.com") || url.Contains("youtu.be"))
             {
                 args.Add("--extractor-args");
-                args.Add("youtube:player_client=android,web");
+                args.Add(extractAudio
+                    ? "youtube:player_client=android_music"
+                    : "youtube:player_client=android,web");
             }
 
             // Detect available browser cookies dynamically
