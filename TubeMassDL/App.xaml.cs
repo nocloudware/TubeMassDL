@@ -37,6 +37,7 @@ public partial class App : System.Windows.Application
         {
             base.OnStartup(e);
             CsvImporter.SelfTest();
+            DownloadManager.SelfTest();
             System.Windows.Application.Current.DispatcherUnhandledException += (_, args) =>
             {
                 LogMessage($"Error: {args.Exception.Message}");

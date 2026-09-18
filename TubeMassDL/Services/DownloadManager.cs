@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -198,10 +199,22 @@ public class DownloadManager
 
         try
         {
+            string fileName = ResolveFileName(item);
+            string? customName = CustomBaseName(item);
+
+            if (FindExistingFile(task.OutputPath, customName, fileName) is { } existing)
+            {
+                SessionLog.Add("Ya existe (se omite): " + existing);
+                item.ProgressBarVisible = false;
+                item.Status = FileStatus.Processed;
+                item.StatusText = "✓";
+                ItemCompleted?.Invoke(item, true);
+                return;
+            }
+
             if (site.IsDirectFile)
             {
                 var httpDl = new HttpDownloader();
-                string fileName = ResolveFileName(item);
                 success = await httpDl.DownloadAsync(item.FilePath, task.OutputPath, fileName,
                     new Progress<int>(ReportProgress), ct);
             }
@@ -211,7 +224,7 @@ public class DownloadManager
                 ytdlp.ProgressUpdated += p => ReportProgress(p);
                 ytdlp.Log += msg => SessionLog.Add(msg);
                 var (ok, _, err) = await ytdlp.DownloadAsync(item.FilePath, task.OutputPath,
-                    task.Format, task.AntiBlock, task.ExtractAudio, CustomBaseName(item), ct);
+                    task.Format, task.AntiBlock, task.ExtractAudio, customName, ct);
                 success = ok;
                 if (!ok && err != null) item.ResultMessage = err;
             }
@@ -283,6 +296,52 @@ public class DownloadManager
         string uriName = Path.GetFileName(new Uri(item.FilePath).AbsolutePath);
         string? custom = CustomBaseName(item);
         return custom != null ? custom + Path.GetExtension(uriName) : uriName;
+    }
+
+    // Devuelve el archivo ya descargado en la carpeta de destino, si existe.
+    // fileName: ruta exacta que escribirá el descargador directo.
+    // baseName: nombre base sin extensión que usará yt-dlp (CSV/salida personalizada);
+    //           si no existe la extensión exacta, busca cualquier formato de medios ya bajado.
+    private static string? FindExistingFile(string outputPath, string? baseName, string fileName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(outputPath) || !Directory.Exists(outputPath)) return null;
+
+            string exact = Path.Combine(outputPath, fileName);
+            if (File.Exists(exact)) return exact;
+
+            if (!string.IsNullOrWhiteSpace(baseName))
+            {
+                return Directory.EnumerateFiles(outputPath)
+                    .Where(f => MediaExts.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase) &&
+                                Path.GetFileNameWithoutExtension(f).Equals(baseName, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault();
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    [Conditional("DEBUG")]
+    public static void SelfTest()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "TubeMassDL_SelfTest_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "Cap 1.mp4"), "x");
+            File.WriteAllText(Path.Combine(dir, "Otro.m4a"), "x");
+
+            Debug.Assert(FindExistingFile(dir, null, "Cap 1.mp4") != null, "exacto existente no detectado");
+            Debug.Assert(FindExistingFile(dir, "Cap 1", "Cap 1.webm") != null, "base por extensión distinta no detectada");
+            Debug.Assert(FindExistingFile(dir, "Nada", "Nada.mp4") == null, "falso positivo");
+            Debug.Assert(FindExistingFile(Path.Combine(dir, "nope"), "Cap 1", "Cap 1.mp4") == null, "carpeta inexistente");
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { }
+        }
     }
 }
 
