@@ -36,14 +36,16 @@ public class YtDlpDownloader
                 var result = await ExecuteDownloadAsync(url, outputPath, format, antiBlock, extractAudio, customName);
                 if (result.success) return result;
 
-                if (attempt < maxRetries)
+                if (attempt < maxRetries && !IsPermanentError(result.error))
                 {
                     Log?.Invoke($"Intento {attempt} falló. Reintentando en {delays[attempt - 1] / 1000}s...");
                     await Task.Delay(delays[attempt - 1], _cts.Token);
                 }
                 else
                 {
-                    Log?.Invoke($"Todos los intentos agotados para {url}");
+                    Log?.Invoke(IsPermanentError(result.error)
+                        ? $"Error permanente, sin reintentar: {url}"
+                        : $"Todos los intentos agotados para {url}");
                     return result;
                 }
             }
@@ -278,6 +280,14 @@ public class YtDlpDownloader
         }
         var last = lines[^1].Trim();
         return last.Length > 300 ? last[..300] : last;
+    }
+
+    private static bool IsPermanentError(string? error)
+    {
+        if (string.IsNullOrEmpty(error)) return false;
+        return error.Contains("Unsupported URL", StringComparison.OrdinalIgnoreCase) ||
+               error.Contains("HTTP Error 404", StringComparison.OrdinalIgnoreCase) ||
+               error.Contains("HTTP Error 410", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? DetectLoginError(string stderr, string? usedBrowser)
