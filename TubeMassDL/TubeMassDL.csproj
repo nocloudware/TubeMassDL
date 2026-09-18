@@ -8,8 +8,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyTitle>TubeMassDL</AssemblyTitle>
-    <AssemblyVersion>1.4.8.0</AssemblyVersion>
-    <FileVersion>1.4.8.0</FileVersion>
+    <AssemblyVersion>1.4.9.0</AssemblyVersion>
+    <FileVersion>1.4.9.0</FileVersion>
     <Description>Cazador de Enlaces y Descargador Masivo</Description>
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
   </PropertyGroup>
