@@ -70,6 +70,37 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
         UrlTextBox.Clear();
     }
 
+    private void OnImportCsvClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new System.Windows.Forms.OpenFileDialog
+        {
+            Filter = "CSV (*.csv)|*.csv|Texto (*.txt)|*.txt|Todos los archivos (*.*)|*.*",
+            Title = Translations.Get("CsvBtn")
+        };
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+        string text;
+        try
+        {
+            text = File.ReadAllText(dialog.FileName);
+        }
+        catch
+        {
+            System.Windows.MessageBox.Show("No se pudo leer el archivo.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        var (rows, invalid) = CsvImporter.Parse(text);
+        int added = 0;
+        foreach (var (name, url) in rows)
+        {
+            if (_collector.AddFromCsv(name, url)) added++;
+        }
+
+        string msg = string.Format(Translations.Get("CsvResult"), added, invalid);
+        System.Windows.MessageBox.Show(msg, Translations.Get("CsvBtn"), MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private void OnDownloadClick(object sender, RoutedEventArgs e)
     {
         var selected = _collector.Items
@@ -159,6 +190,7 @@ public partial class OptionsPanel : System.Windows.Controls.UserControl
     {
         CaptureToggle.Content = "📋 " + Translations.Get("CaptureLabel", ci);
         UrlLabel.Text = Translations.Get("UrlLabel", ci);
+        CsvButton.Content = Translations.Get("CsvBtn", ci);
         TypeLabel.Text = Translations.Get("TypeLabel", ci);
         FormatLabel.Text = Translations.Get("FormatLabel", ci);
         QualityLabel.Text = Translations.Get("QualityLabel", ci);

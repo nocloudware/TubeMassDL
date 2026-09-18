@@ -201,7 +201,7 @@ public class DownloadManager
             if (site.IsDirectFile)
             {
                 var httpDl = new HttpDownloader();
-                string fileName = Path.GetFileName(new Uri(item.FilePath).AbsolutePath);
+                string fileName = ResolveFileName(item);
                 success = await httpDl.DownloadAsync(item.FilePath, task.OutputPath, fileName,
                     new Progress<int>(ReportProgress), ct);
             }
@@ -211,7 +211,7 @@ public class DownloadManager
                 ytdlp.ProgressUpdated += p => ReportProgress(p);
                 ytdlp.Log += msg => SessionLog.Add(msg);
                 var (ok, _, err) = await ytdlp.DownloadAsync(item.FilePath, task.OutputPath,
-                    task.Format, task.AntiBlock, task.ExtractAudio, ct);
+                    task.Format, task.AntiBlock, task.ExtractAudio, CustomBaseName(item), ct);
                 success = ok;
                 if (!ok && err != null) item.ResultMessage = err;
             }
@@ -265,6 +265,24 @@ public class DownloadManager
         }
 
         ItemCompleted?.Invoke(item, success);
+    }
+
+    private static readonly string[] MediaExts = { ".mp4", ".avi", ".mkv", ".webm", ".mov", ".m4v", ".mp3", ".m4a", ".opus", ".wav", ".flac" };
+
+    // Nombre base sin extensión de medios (para que el descargador agregue la real).
+    private static string? CustomBaseName(BaseFileItem item)
+    {
+        var name = item.CustomOutputName;
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var ext = Path.GetExtension(name);
+        return MediaExts.Contains(ext, StringComparer.OrdinalIgnoreCase) ? Path.ChangeExtension(name, null) : name;
+    }
+
+    private static string ResolveFileName(BaseFileItem item)
+    {
+        string uriName = Path.GetFileName(new Uri(item.FilePath).AbsolutePath);
+        string? custom = CustomBaseName(item);
+        return custom != null ? custom + Path.GetExtension(uriName) : uriName;
     }
 }
 

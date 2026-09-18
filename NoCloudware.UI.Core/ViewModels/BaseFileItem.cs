@@ -45,4 +45,7 @@ public partial class BaseFileItem : ObservableObject
 
     [ObservableProperty]
     private bool _progressBarVisible;
+
+    [ObservableProperty]
+    private string? _customOutputName;
 }

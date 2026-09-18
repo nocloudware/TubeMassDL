@@ -75,6 +75,17 @@ public class LinkCollector
             _ = ExpandPlaylistAsync(link.Url);
     }
 
+    public bool AddFromCsv(string name, string url)
+    {
+        if (Items.Any(i => i.FilePath.Equals(url, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        var item = MakeItem(url, name, "CSV", false);
+        item.CustomOutputName = name;
+        Items.Insert(0, item);
+        return true;
+    }
+
     private async Task ExpandPlaylistAsync(string playlistUrl)
     {
         try

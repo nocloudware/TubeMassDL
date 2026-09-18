@@ -22,7 +22,7 @@ public class YtDlpDownloader
 
     public async Task<(bool success, string? filePath, string? error)> DownloadAsync(
         string url, string outputPath, string format, bool antiBlock, bool extractAudio,
-        CancellationToken ct = default)
+        string? customName = null, CancellationToken ct = default)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
@@ -33,7 +33,7 @@ public class YtDlpDownloader
         {
             try
             {
-                var result = await ExecuteDownloadAsync(url, outputPath, format, antiBlock, extractAudio);
+                var result = await ExecuteDownloadAsync(url, outputPath, format, antiBlock, extractAudio, customName);
                 if (result.success) return result;
 
                 if (attempt < maxRetries)
@@ -70,7 +70,7 @@ public class YtDlpDownloader
     }
 
     private async Task<(bool success, string? filePath, string? error)> ExecuteDownloadAsync(
-        string url, string outputPath, string format, bool antiBlock, bool extractAudio)
+        string url, string outputPath, string format, bool antiBlock, bool extractAudio, string? customName = null)
     {
         try
         {
@@ -141,7 +141,9 @@ public class YtDlpDownloader
 
             args.Add("--ignore-errors");
 
-            string safeOutput = Path.Combine(outputPath, "%(title)s.%(ext)s");
+            string safeOutput = string.IsNullOrEmpty(customName)
+                ? Path.Combine(outputPath, "%(title)s.%(ext)s")
+                : Path.Combine(outputPath, customName.Replace("%", "") + ".%(ext)s");
             args.Add("-o"); args.Add(safeOutput);
             args.Add("--no-playlist");
             args.Add("--progress"); args.Add("--newline");
