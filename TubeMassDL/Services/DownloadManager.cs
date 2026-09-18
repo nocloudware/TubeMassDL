@@ -201,8 +201,9 @@ public class DownloadManager
         {
             string fileName = ResolveFileName(item);
             string? customName = CustomBaseName(item);
+            string? expectedFile = ExpectedFileName(fileName, customName, site.IsDirectFile, task.Format, task.ExtractAudio);
 
-            if (FindExistingFile(task.OutputPath, customName, fileName) is { } existing)
+            if (expectedFile != null && FindExistingFile(task.OutputPath, expectedFile) is { } existing)
             {
                 SessionLog.Add("Ya existe (se omite): " + existing);
                 item.ProgressBarVisible = false;
@@ -298,27 +299,27 @@ public class DownloadManager
         return custom != null ? custom + Path.GetExtension(uriName) : uriName;
     }
 
-    // Devuelve el archivo ya descargado en la carpeta de destino, si existe.
-    // fileName: ruta exacta que escribirá el descargador directo.
-    // baseName: nombre base sin extensión que usará yt-dlp (CSV/salida personalizada);
-    //           si no existe la extensión exacta, busca cualquier formato de medios ya bajado.
-    private static string? FindExistingFile(string outputPath, string? baseName, string fileName)
+    // Nombre con el que quedará el archivo en disco, o null si no se puede determinar
+    // (yt-dlp sin nombre personalizado o con formato sin extensión explícita).
+    // fileName: nombre que escribe el descargador directo (extensión del link).
+    // customName: nombre base para yt-dlp; la extensión sale del formato elegido en el panel derecho.
+    internal static string? ExpectedFileName(string fileName, string? customName, bool isDirectFile, string format, bool extractAudio)
+    {
+        if (isDirectFile) return fileName;
+        if (string.IsNullOrWhiteSpace(customName)) return null;
+        var ext = YtDlpDownloader.ExpectedOutputExt(format, extractAudio);
+        return ext != null ? customName + "." + ext : null;
+    }
+
+    // Devuelve el archivo ya descargado en la carpeta de destino si existe (nombre.ext exacto).
+    private static string? FindExistingFile(string outputPath, string? expectedFileName)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(outputPath) || !Directory.Exists(outputPath)) return null;
-
-            string exact = Path.Combine(outputPath, fileName);
-            if (File.Exists(exact)) return exact;
-
-            if (!string.IsNullOrWhiteSpace(baseName))
-            {
-                return Directory.EnumerateFiles(outputPath)
-                    .Where(f => MediaExts.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase) &&
-                                Path.GetFileNameWithoutExtension(f).Equals(baseName, StringComparison.OrdinalIgnoreCase))
-                    .FirstOrDefault();
-            }
-            return null;
+            if (string.IsNullOrWhiteSpace(outputPath) || string.IsNullOrWhiteSpace(expectedFileName)) return null;
+            return Directory.Exists(outputPath) && File.Exists(Path.Combine(outputPath, expectedFileName))
+                ? Path.Combine(outputPath, expectedFileName)
+                : null;
         }
         catch { return null; }
     }
@@ -330,13 +331,26 @@ public class DownloadManager
         try
         {
             Directory.CreateDirectory(dir);
-            File.WriteAllText(Path.Combine(dir, "Cap 1.mp4"), "x");
-            File.WriteAllText(Path.Combine(dir, "Otro.m4a"), "x");
+            File.WriteAllText(Path.Combine(dir, "Cap 1.m4a"), "x");
+            File.WriteAllText(Path.Combine(dir, "Cap 1.webm"), "x");
 
-            Debug.Assert(FindExistingFile(dir, null, "Cap 1.mp4") != null, "exacto existente no detectado");
-            Debug.Assert(FindExistingFile(dir, "Cap 1", "Cap 1.webm") != null, "base por extensión distinta no detectada");
-            Debug.Assert(FindExistingFile(dir, "Nada", "Nada.mp4") == null, "falso positivo");
-            Debug.Assert(FindExistingFile(Path.Combine(dir, "nope"), "Cap 1", "Cap 1.mp4") == null, "carpeta inexistente");
+            // Extensiones derivadas del formato elegido.
+            Debug.Assert(YtDlpDownloader.ExpectedOutputExt("bestaudio[ext=m4a]/bestaudio/best", true) == "m4a");
+            Debug.Assert(YtDlpDownloader.ExpectedOutputExt("bestaudio[ext=opus]/bestaudio/best", true) == "opus");
+            Debug.Assert(YtDlpDownloader.ExpectedOutputExt("bestvideo[height<=1080][ext=webm]+bestaudio[ext=m4a]/best", false) == "webm");
+            Debug.Assert(YtDlpDownloader.ExpectedOutputExt("bestvideo+bestaudio/best", false) == null);
+
+            // Nombre final esperado según el caso.
+            Debug.Assert(ExpectedFileName("Cap 1.webm", null, true, "x", false) == "Cap 1.webm");
+            Debug.Assert(ExpectedFileName("Cap 1.mp4", "Cap 1", true, "x", false) == "Cap 1.mp4");
+            Debug.Assert(ExpectedFileName("Cap 1.mp4", "Cap 1", false, "bestaudio[ext=m4a]/bestaudio/best", true) == "Cap 1.m4a");
+            Debug.Assert(ExpectedFileName("Cap 1.mp4", "Cap 1", false, "bestvideo+bestaudio/best", false) == null);
+
+            // Comprobación exacta nombre.ext: el m4a existente no bloquea pedir mp4/webm que no existen.
+            Debug.Assert(FindExistingFile(dir, "Cap 1.m4a") != null);
+            Debug.Assert(FindExistingFile(dir, "Cap 1.webm") != null);
+            Debug.Assert(FindExistingFile(dir, "Cap 1.mp4") == null);
+            Debug.Assert(FindExistingFile(Path.Combine(dir, "nada"), "Cap 1.m4a") == null);
         }
         finally
         {

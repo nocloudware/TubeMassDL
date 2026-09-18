@@ -125,16 +125,12 @@ public class YtDlpDownloader
             if (extractAudio)
             {
                 args.Add("--extract-audio");
-                string audioFmt = format.Contains("m4a") ? "m4a" :
-                                  format.Contains("opus") ? "opus" :
-                                  format.Contains("mp3") ? "mp3" :
-                                  format.Contains("wav") ? "wav" : "m4a";
-                args.Add("--audio-format"); args.Add(audioFmt);
+                args.Add("--audio-format"); args.Add(ExpectedOutputExt(format, extractAudio)!);
             }
             else
             {
                 // For video: recode to requested container if the direct codec isn't available
-                string videoExt = GetRequestedVideoExt(format);
+                string? videoExt = ExpectedOutputExt(format, extractAudio);
                 if (!string.IsNullOrEmpty(videoExt) && videoExt != "mp4")
                 {
                     args.Add("--recode-video"); args.Add(videoExt);
@@ -330,11 +326,18 @@ public class YtDlpDownloader
         catch { }
     }
 
-    private static string GetRequestedVideoExt(string format)
+    // Extensión final que yt-dlp guardará según el formato elegido y si se extrae audio.
+    internal static string? ExpectedOutputExt(string format, bool extractAudio)
     {
+        if (extractAudio)
+            return format.Contains("m4a") ? "m4a" :
+                   format.Contains("opus") ? "opus" :
+                   format.Contains("mp3") ? "mp3" :
+                   format.Contains("wav") ? "wav" : "m4a";
+
         // Extract video extension from yt-dlp format string, e.g. "bestvideo[ext=webm]+bestaudio/best" -> "webm"
         var match = Regex.Match(format, @"\[ext=(\w+)\]");
-        return match.Success ? match.Groups[1].Value : "";
+        return match.Success ? match.Groups[1].Value : null;
     }
 
     public static string? GetNodePath()
